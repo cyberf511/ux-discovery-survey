@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS questions (
 
 CREATE TABLE IF NOT EXISTS sessions (
   id          TEXT PRIMARY KEY,
+  code        TEXT NOT NULL DEFAULT '',
   category    TEXT NOT NULL,
   name        TEXT NOT NULL DEFAULT '',
   started_at  TEXT NOT NULL,
@@ -84,13 +86,64 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+`
+
+// الفهارس منفصلة عن الجداول لأنها قد تشير إلى أعمدة تضيفها الترقية،
+// فلا بد أن تُنفَّذ بعدها لا قبلها.
+const indexes = `
 CREATE INDEX IF NOT EXISTS idx_answers_question ON answers(question_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_category ON sessions(category);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_code ON sessions(code) WHERE code <> '';
 `
+
+// الأعمدة المضافة بعد الإصدار الأول. SQLite لا يدعم ADD COLUMN IF NOT EXISTS،
+// فنتجاهل خطأ العمود المكرّر عند التشغيل على قاعدة مُرقّاة أصلًا.
+var addedColumns = []string{
+	`ALTER TABLE sessions ADD COLUMN code TEXT NOT NULL DEFAULT ''`,
+}
 
 func (s *Store) migrate() error {
 	if _, err := s.db.Exec(schema); err != nil {
 		return fmt.Errorf("إنشاء الجداول: %w", err)
+	}
+	for _, stmt := range addedColumns {
+		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("ترقية الأعمدة: %w", err)
+		}
+	}
+	if _, err := s.db.Exec(indexes); err != nil {
+		return fmt.Errorf("إنشاء الفهارس: %w", err)
+	}
+	return s.backfillCodes()
+}
+
+// backfillCodes يمنح الجلسات القديمة أكواد متابعة حتى تعمل لها ميزة الاستئناف.
+func (s *Store) backfillCodes() error {
+	rows, err := s.db.Query(`SELECT id FROM sessions WHERE code = ''`)
+	if err != nil {
+		return err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		code, err := s.uniqueCode()
+		if err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`UPDATE sessions SET code = ? WHERE id = ?`, code, id); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -297,31 +350,56 @@ func (s *Store) CreateSession(c model.Category, name string) (model.Session, err
 	if !open {
 		return model.Session{}, ErrSurveyClosed
 	}
+	code, err := s.uniqueCode()
+	if err != nil {
+		return model.Session{}, err
+	}
 	sess := model.Session{
 		ID:        newID(),
+		Code:      code,
 		Category:  c,
 		Name:      name,
 		StartedAt: now(),
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO sessions(id, category, name, started_at, finished_at) VALUES(?, ?, ?, ?, '')`,
-		sess.ID, string(sess.Category), sess.Name, sess.StartedAt)
+		`INSERT INTO sessions(id, code, category, name, started_at, finished_at) VALUES(?, ?, ?, ?, ?, '')`,
+		sess.ID, sess.Code, string(sess.Category), sess.Name, sess.StartedAt)
 	if err != nil {
 		return model.Session{}, err
 	}
 	return sess, nil
 }
 
+const sessionCols = `id, code, category, name, started_at, finished_at`
+
 // Session يعيد جلسة بالمعرّف.
 func (s *Store) Session(id string) (model.Session, error) {
+	return s.sessionWhere(`id = ?`, id)
+}
+
+// SessionByCode يعيد جلسة بكود المتابعة. الكود غير حسّاس لحالة الأحرف أو المسافات
+// لأن المشارك يكتبه بيده من ورقة أو رسالة.
+func (s *Store) SessionByCode(code string) (model.Session, error) {
+	code = NormalizeCode(code)
+	if code == "" {
+		return model.Session{}, ErrNotFound
+	}
+	return s.sessionWhere(`code = ?`, code)
+}
+
+func (s *Store) sessionWhere(cond string, arg any) (model.Session, error) {
 	var sess model.Session
-	err := s.db.QueryRow(
-		`SELECT id, category, name, started_at, finished_at FROM sessions WHERE id = ?`, id).
-		Scan(&sess.ID, &sess.Category, &sess.Name, &sess.StartedAt, &sess.FinishedAt)
+	err := s.db.QueryRow(`SELECT `+sessionCols+` FROM sessions WHERE `+cond, arg).
+		Scan(&sess.ID, &sess.Code, &sess.Category, &sess.Name, &sess.StartedAt, &sess.FinishedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sess, ErrNotFound
 	}
 	return sess, err
+}
+
+// NormalizeCode يوحّد شكل الكود المُدخل قبل مطابقته.
+func NormalizeCode(code string) string {
+	return strings.ToUpper(strings.TrimSpace(code))
 }
 
 // FinishSession يسجّل انتهاء الجلسة.
@@ -345,7 +423,7 @@ func (s *Store) Sessions(c model.Category) ([]model.Session, error) {
 		rows *sql.Rows
 		err  error
 	)
-	base := `SELECT id, category, name, started_at, finished_at FROM sessions`
+	base := `SELECT ` + sessionCols + ` FROM sessions`
 	if c == "" {
 		rows, err = s.db.Query(base + ` ORDER BY started_at`)
 	} else {
@@ -358,7 +436,7 @@ func (s *Store) Sessions(c model.Category) ([]model.Session, error) {
 	out := []model.Session{}
 	for rows.Next() {
 		var sess model.Session
-		if err := rows.Scan(&sess.ID, &sess.Category, &sess.Name, &sess.StartedAt, &sess.FinishedAt); err != nil {
+		if err := rows.Scan(&sess.ID, &sess.Code, &sess.Category, &sess.Name, &sess.StartedAt, &sess.FinishedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, sess)
@@ -535,6 +613,43 @@ func nonNilStrs(s []string) []string {
 }
 
 func now() string { return time.Now().UTC().Format(time.RFC3339) }
+
+// codeAlphabet يستبعد الأحرف الملتبسة (O/0، I/1/L) لأن الكود يُنسخ يدويًا.
+const codeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+const codeLength = 6
+
+// uniqueCode يولّد كود متابعة غير مستخدم. الاصطدام نادر جدًا، لكن المحاولات
+// المحدودة تمنع أي احتمال لحلقة لا نهائية.
+func (s *Store) uniqueCode() (string, error) {
+	for attempt := 0; attempt < 20; attempt++ {
+		code, err := randomCode()
+		if err != nil {
+			return "", err
+		}
+		var exists int
+		err = s.db.QueryRow(`SELECT COUNT(*) FROM sessions WHERE code = ?`, code).Scan(&exists)
+		if err != nil {
+			return "", err
+		}
+		if exists == 0 {
+			return code, nil
+		}
+	}
+	return "", fmt.Errorf("تعذّر توليد كود متابعة غير مكرّر")
+}
+
+func randomCode() (string, error) {
+	b := make([]byte, codeLength)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("توليد كود المتابعة: %w", err)
+	}
+	out := make([]byte, codeLength)
+	for i, v := range b {
+		out[i] = codeAlphabet[int(v)%len(codeAlphabet)]
+	}
+	return string(out), nil
+}
 
 func newID() string {
 	b := make([]byte, 16)

@@ -1,9 +1,11 @@
 package store
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"surveyapp/internal/model"
@@ -61,6 +63,105 @@ func TestSessionAndAnswerRoundTrip(t *testing.T) {
 	}
 	if got := string(answers[qid]); got != `"أبدأ بالجولة"` {
 		t.Fatalf("القيمة لم تُحدَّث: %s", got)
+	}
+}
+
+// المشارك لازم يقدر يستأنف جلسته بكود قصير، بلا اعتماد على تخزين المتصفح.
+func TestResumeSessionByCode(t *testing.T) {
+	s := newTestStore(t)
+	sess, err := s.CreateSession(model.CatGuard, "فيصل")
+	if err != nil {
+		t.Fatalf("إنشاء جلسة: %v", err)
+	}
+	if sess.Code == "" {
+		t.Fatalf("الجلسة يجب أن تحمل كود متابعة")
+	}
+
+	got, err := s.SessionByCode(sess.Code)
+	if err != nil {
+		t.Fatalf("استئناف بالكود: %v", err)
+	}
+	if got.ID != sess.ID {
+		t.Fatalf("الكود أعاد جلسة خاطئة: %s بدل %s", got.ID, sess.ID)
+	}
+
+	// الكود غير حسّاس لحالة الأحرف ولا للمسافات، لأن المشارك يكتبه بيده.
+	if got, err = s.SessionByCode("  " + strings.ToLower(sess.Code) + " "); err != nil || got.ID != sess.ID {
+		t.Fatalf("الكود يجب أن يُقبل بأي حالة أحرف: %v", err)
+	}
+
+	if _, err := s.SessionByCode("ZZZZZZ"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("كود مجهول يجب أن يعيد ErrNotFound، وجدنا %v", err)
+	}
+}
+
+// قاعدة بيانات أُنشئت قبل إضافة أكواد المتابعة يجب أن تُرقَّى بلا انهيار،
+// وأن تحصل جلساتها القائمة على أكواد.
+func TestMigratesLegacyDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("فتح قاعدة قديمة: %v", err)
+	}
+	_, err = legacy.Exec(`
+		CREATE TABLE sessions (
+		  id          TEXT PRIMARY KEY,
+		  category    TEXT NOT NULL,
+		  name        TEXT NOT NULL DEFAULT '',
+		  started_at  TEXT NOT NULL,
+		  finished_at TEXT NOT NULL DEFAULT ''
+		);
+		INSERT INTO sessions(id, category, name, started_at) VALUES('old1', 'guard', 'فيصل', '2026-07-20T08:00:00Z');`)
+	if err != nil {
+		t.Fatalf("تهيئة القاعدة القديمة: %v", err)
+	}
+	legacy.Close()
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("ترقية القاعدة القديمة فشلت: %v", err)
+	}
+	defer s.Close()
+
+	sess, err := s.Session("old1")
+	if err != nil {
+		t.Fatalf("قراءة جلسة قديمة: %v", err)
+	}
+	if sess.Name != "فيصل" {
+		t.Fatalf("بيانات الجلسة القديمة ضاعت: %+v", sess)
+	}
+	if sess.Code == "" {
+		t.Fatalf("الجلسة القديمة يجب أن تحصل على كود متابعة")
+	}
+	if got, err := s.SessionByCode(sess.Code); err != nil || got.ID != "old1" {
+		t.Fatalf("الاستئناف بكود الجلسة القديمة فشل: %v", err)
+	}
+}
+
+func TestSessionCodesAreUnique(t *testing.T) {
+	s := newTestStore(t)
+	seen := map[string]bool{}
+	for i := 0; i < 50; i++ {
+		sess, err := s.CreateSession(model.CatGuard, "")
+		if err != nil {
+			t.Fatalf("إنشاء جلسة %d: %v", i, err)
+		}
+		if seen[sess.Code] {
+			t.Fatalf("تكرّر كود المتابعة: %s", sess.Code)
+		}
+		seen[sess.Code] = true
+	}
+}
+
+// الأكواد تُقرأ وتُكتب يدويًا، فلا تحتمل حروفًا متشابهة الشكل.
+func TestSessionCodeAvoidsAmbiguousCharacters(t *testing.T) {
+	s := newTestStore(t)
+	for i := 0; i < 30; i++ {
+		sess, _ := s.CreateSession(model.CatGuard, "")
+		if strings.ContainsAny(sess.Code, "OI01L") {
+			t.Fatalf("الكود يحوي حرفًا ملتبسًا: %s", sess.Code)
+		}
 	}
 }
 

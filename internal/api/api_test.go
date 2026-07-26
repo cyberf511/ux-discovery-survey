@@ -105,6 +105,57 @@ func TestParticipantFlow(t *testing.T) {
 	}
 }
 
+// الاستئناف بالكود هو المسار الوحيد المستقل عن تخزين المتصفح،
+// لأن localStorage مربوط بالعنوان ويضيع عند تغيّر المضيف أو مسح بيانات الموقع.
+func TestResumeByCode(t *testing.T) {
+	srv, _ := newTestServer(t)
+	c := srv.Client()
+
+	_, created := do(t, c, "POST", srv.URL+"/api/sessions", map[string]string{"category": "guard"})
+	code, _ := created["code"].(string)
+	if code == "" {
+		t.Fatalf("إنشاء الجلسة يجب أن يعيد كود متابعة: %v", created)
+	}
+
+	// عميل جديد بلا كوكيز ولا تخزين — يحاكي جهازًا أو متصفحًا آخر.
+	fresh := &http.Client{}
+	res, resumed := do(t, fresh, "POST", srv.URL+"/api/sessions/resume",
+		map[string]string{"code": strings.ToLower(code)})
+	if res.StatusCode != 200 {
+		t.Fatalf("الاستئناف بالكود فشل: %d %v", res.StatusCode, resumed)
+	}
+	if resumed["id"] != created["id"] {
+		t.Fatalf("الكود أعاد جلسة خاطئة: %v", resumed)
+	}
+
+	res, _ = do(t, fresh, "POST", srv.URL+"/api/sessions/resume", map[string]string{"code": "ZZZZZZ"})
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("كود مجهول يجب أن يعيد 404، وجدنا %d", res.StatusCode)
+	}
+}
+
+// كوكي الجلسة يعيد المشارك تلقائيًا حتى لو مُسح تخزين المتصفح.
+func TestCurrentSessionFromCookie(t *testing.T) {
+	srv, _ := newTestServer(t)
+	c := &http.Client{Jar: newJar()}
+
+	_, created := do(t, c, "POST", srv.URL+"/api/sessions", map[string]string{"category": "guard"})
+
+	res, current := do(t, c, "GET", srv.URL+"/api/sessions/current", nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("استرجاع الجلسة من الكوكي فشل: %d", res.StatusCode)
+	}
+	if current["id"] != created["id"] {
+		t.Fatalf("الكوكي أعاد جلسة خاطئة: %v", current)
+	}
+
+	// عميل بلا كوكي يجب أن يحصل على 404 لا على جلسة شخص آخر.
+	res, _ = do(t, &http.Client{}, "GET", srv.URL+"/api/sessions/current", nil)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("بلا كوكي توقعنا 404، وجدنا %d", res.StatusCode)
+	}
+}
+
 func TestUnknownCategoryRejected(t *testing.T) {
 	srv, _ := newTestServer(t)
 	res, _ := do(t, srv.Client(), "POST", srv.URL+"/api/sessions",

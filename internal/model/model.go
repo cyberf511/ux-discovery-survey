@@ -98,7 +98,10 @@ func (q Question) AppliesTo(c Category) bool {
 
 // Session جلسة مشارك واحد.
 type Session struct {
-	ID         string   `json:"id"`
+	ID string `json:"id"`
+	// Code كود متابعة قصير يكتبه المشارك ليستأنف من أي جهاز أو متصفح،
+	// لأن تخزين المتصفح مربوط بالعنوان ولا ينجو من تغيّره.
+	Code       string   `json:"code"`
 	Category   Category `json:"category"`
 	Name       string   `json:"name"`
 	StartedAt  string   `json:"started_at"`

@@ -49,6 +49,8 @@ func (s *Server) Routes() http.Handler {
 	// واجهة المشارك
 	mux.HandleFunc("GET /api/meta", s.handleMeta)
 	mux.HandleFunc("POST /api/sessions", s.handleCreateSession)
+	mux.HandleFunc("POST /api/sessions/resume", s.handleResumeSession)
+	mux.HandleFunc("GET /api/sessions/current", s.handleCurrentSession)
 	mux.HandleFunc("GET /api/sessions/{id}", s.handleGetSession)
 	mux.HandleFunc("POST /api/sessions/{id}/answers", s.handleSaveAnswer)
 	mux.HandleFunc("POST /api/sessions/{id}/finish", s.handleFinishSession)
@@ -124,7 +126,55 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	setSessionCookie(w, sess.ID)
 	writeJSON(w, http.StatusCreated, sess)
+}
+
+// handleResumeSession يستأنف جلسة بكود المتابعة — المسار المستقل عن تخزين المتصفح.
+func (s *Server) handleResumeSession(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	sess, err := s.st.SessionByCode(body.Code)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	setSessionCookie(w, sess.ID)
+	writeJSON(w, http.StatusOK, sess)
+}
+
+// handleCurrentSession يعيد الجلسة المرتبطة بالكوكي، لتنجو من مسح التخزين المحلي.
+func (s *Server) handleCurrentSession(w http.ResponseWriter, r *http.Request) {
+	c, err := r.Cookie(sessionCookie)
+	if err != nil || c.Value == "" {
+		writeError(w, http.StatusNotFound, "لا توجد جلسة محفوظة")
+		return
+	}
+	sess, err := s.st.Session(c.Value)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, sess)
+}
+
+// sessionCookie اسم كوكي جلسة المشارك.
+const sessionCookie = "survey_sid"
+
+// setSessionCookie يثبّت هوية المشارك لستة أشهر — أطول بكثير من أسبوع الجمع.
+func setSessionCookie(w http.ResponseWriter, id string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    id,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   180 * 24 * 3600,
+	})
 }
 
 func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {

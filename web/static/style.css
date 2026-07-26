@@ -241,6 +241,40 @@ input[type="text"]:focus, textarea:focus {
 .done h1 { margin: 0 0 10px; }
 .done p { color: var(--muted); margin: 0 0 28px; }
 
+/* ---------- كود المتابعة ---------- */
+
+.code-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: .85rem;
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.code-note strong {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 1.15rem;
+  letter-spacing: .16em;
+  color: var(--brand-dark);
+  background: #e7f3f1;
+  padding: 3px 10px;
+  border-radius: 8px;
+  unicode-bidi: embed;
+  direction: ltr;
+  display: inline-block;
+}
+
+.resume { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
+.resume-box { margin-top: 12px; }
+.resume-box input {
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 1.35rem;
+  letter-spacing: .22em;
+  text-align: center;
+  text-transform: uppercase;
+  direction: ltr;
+}
+
 .closed {
   background: #fff4e5;
   border: 2px solid #f0b429;

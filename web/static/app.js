@@ -9,6 +9,7 @@
   var app = document.getElementById("app");
   var state = {
     sessionId: null,
+    code: "",
     questions: [],
     answers: {},   // questionId -> value
     index: 0,
@@ -154,8 +155,7 @@
       beginBtn.textContent = "جارٍ البدء…";
       api("POST", "/api/sessions", { category: chosen, name: nameInput.value.trim() })
         .then(function (sess) {
-          store(KEY_SESSION, sess.id);
-          store(KEY_INDEX, "0");
+          adoptSession(sess, 0);
           return loadSession(sess.id);
         })
         .catch(function (err) {
@@ -164,6 +164,37 @@
           alert(err.message);
         });
     });
+
+    // الاستئناف بالكود: المسار الوحيد الذي ينجو من تغيّر العنوان أو مسح التخزين.
+    var toggle = node.querySelector("[data-resume-toggle]");
+    var box = node.querySelector("[data-resume-box]");
+    var codeInput = node.querySelector("[data-code]");
+    var codeGo = node.querySelector("[data-resume-go]");
+    var codeStatus = node.querySelector("[data-resume-status]");
+
+    toggle.addEventListener("click", function () {
+      box.hidden = !box.hidden;
+      if (!box.hidden) codeInput.focus();
+    });
+
+    function resume() {
+      var code = codeInput.value.trim();
+      if (!code) return;
+      codeGo.disabled = true;
+      setStatus(codeStatus, "جارٍ البحث…", "");
+      api("POST", "/api/sessions/resume", { code: code })
+        .then(function (sess) {
+          store(KEY_PENDING, null); // إجابات جهاز آخر لا تخص هذه الجلسة
+          adoptSession(sess, null);
+          return loadSession(sess.id);
+        })
+        .catch(function (err) {
+          codeGo.disabled = false;
+          setStatus(codeStatus, err.status === 404 ? "ما لقينا استبيانًا بهذا الكود. تأكّد من كتابته." : err.message, "err");
+        });
+    }
+    codeGo.addEventListener("click", resume);
+    codeInput.addEventListener("keydown", function (e) { if (e.key === "Enter") resume(); });
 
     render(node);
 
@@ -214,7 +245,19 @@
     skip.addEventListener("click", function () { move(1); });
 
     render(node);
+    showCode();
     if (Object.keys(pending()).length) flush(status);
+  }
+
+  // showCode يعرض كود المتابعة في الشاشة الحالية إن وُجد.
+  function showCode() {
+    var badge = app.querySelector("[data-code-badge]");
+    if (!badge) return;
+    if (!state.code) {
+      badge.parentNode.style.display = "none";
+      return;
+    }
+    badge.textContent = state.code;
   }
 
   function isEmpty(v) {
@@ -263,6 +306,7 @@
       showQuestion();
     });
     render(node);
+    showCode();
   }
 
   // ---------- عناصر الإجابة حسب النوع ----------
@@ -409,9 +453,28 @@
 
   // ---------- الإقلاع ----------
 
+  // firstUnanswered يحدد موضع أول سؤال بلا إجابة، أو نهاية الاستبيان إن أُجيب كله.
+  function firstUnanswered() {
+    for (var i = 0; i < state.questions.length; i++) {
+      if (isEmpty(state.answers[state.questions[i].id])) return i;
+    }
+    return state.questions.length;
+  }
+
+  // adoptSession يثبّت هوية الجلسة محليًا. index = null يعني «احسبه من الإجابات».
+  function adoptSession(sess, index) {
+    state.sessionId = sess.id;
+    state.code = sess.code || "";
+    store(KEY_SESSION, sess.id);
+    if (index === null) store(KEY_INDEX, null);
+    else store(KEY_INDEX, String(index));
+  }
+
   function loadSession(id) {
     return api("GET", "/api/sessions/" + id).then(function (data) {
       state.sessionId = data.session.id;
+      state.code = data.session.code || "";
+      store(KEY_SESSION, data.session.id);
       state.questions = data.questions;
       state.open = data.open;
       state.answers = {};
@@ -422,28 +485,54 @@
       var p = pending();
       Object.keys(p).forEach(function (k) { state.answers[Number(k)] = p[k]; });
 
-      var saved = parseInt(store(KEY_INDEX) || "0", 10);
+      // بلا موضع محفوظ (استئناف من جهاز آخر) نبدأ من أول سؤال بلا إجابة.
+      var stored = store(KEY_INDEX);
+      var saved = stored === null ? firstUnanswered() : parseInt(stored, 10);
       state.index = isNaN(saved) ? 0 : Math.min(Math.max(saved, 0), state.questions.length);
+      store(KEY_INDEX, String(state.index));
 
       if (data.session.finished_at && state.index >= state.questions.length) showDone();
       else showQuestion();
     });
   }
 
-  api("GET", "/api/meta").then(function (meta) {
+  // الاستئناف يجرّب مصدرين مستقلين للهوية قبل أن يستسلم:
+  // التخزين المحلي (يضيع بتغيّر العنوان)، ثم كوكي الخادم (ينجو منه).
+  function boot(meta) {
     state.open = meta.open;
     state.categories = meta.categories;
+
     var id = store(KEY_SESSION);
-    if (!id) { showStart(); return; }
-    return loadSession(id).catch(function () {
-      // جلسة قديمة أو قاعدة بيانات جديدة: نبدأ من الصفر.
-      store(KEY_SESSION, null);
-      store(KEY_INDEX, null);
-      store(KEY_PENDING, null);
-      showStart();
-    });
-  }).catch(function (err) {
+    if (id) {
+      return loadSession(id).catch(function (err) {
+        if (err.status !== 404) throw err; // عطل شبكة: لا نمسح شيئًا
+        return tryCookie();
+      });
+    }
+    return tryCookie();
+  }
+
+  function tryCookie() {
+    return api("GET", "/api/sessions/current")
+      .then(function (sess) {
+        adoptSession(sess, null);
+        return loadSession(sess.id);
+      })
+      .catch(function () {
+        // لا جلسة معروفة: نبدأ من جديد، مع بقاء الاستئناف بالكود متاحًا.
+        store(KEY_SESSION, null);
+        store(KEY_INDEX, null);
+        showStart();
+      });
+  }
+
+  api("GET", "/api/meta").then(boot).catch(function (err) {
     app.textContent = "";
-    app.appendChild(el("div", "closed", "تعذّر تحميل الاستبيان: " + err.message));
+    var box = el("div", "closed");
+    box.appendChild(el("p", null, "تعذّر تحميل الاستبيان: " + err.message));
+    var retry = el("button", "btn primary", "إعادة المحاولة");
+    retry.addEventListener("click", function () { location.reload(); });
+    box.appendChild(retry);
+    app.appendChild(box);
   });
 })();

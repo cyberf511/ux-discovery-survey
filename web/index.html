@@ -29,7 +29,20 @@
   </label>
 
   <button class="btn primary big" data-begin disabled>ابدأ</button>
-  <p class="note">إجاباتك تُحفظ تلقائيًا. تقدر تسكّر وترجع تكمّل من نفس المكان.</p>
+  <p class="note">إجاباتك تُحفظ تلقائيًا أول بأول.</p>
+
+  <div class="resume">
+    <button class="btn link" data-resume-toggle>عندي كود متابعة — أكمّل استبيانًا بدأته</button>
+    <div class="resume-box" data-resume-box hidden>
+      <label class="field">
+        <span>اكتب كود المتابعة (٦ حروف وأرقام)</span>
+        <input type="text" data-code placeholder="مثال: K7M2QP" autocomplete="off"
+               autocapitalize="characters" spellcheck="false" maxlength="8">
+      </label>
+      <button class="btn ghost big" data-resume-go>متابعة</button>
+      <div class="status" data-resume-status></div>
+    </div>
+  </div>
 </template>
 
 <!-- شاشة السؤال -->
@@ -49,6 +62,7 @@
   </div>
   <button class="btn link" data-skip>تخطّي هذا السؤال</button>
   <div class="status" data-status></div>
+  <p class="code-note">كود المتابعة: <strong data-code-badge></strong> — احفظه لو بتكمّل من جهاز أو متصفح ثاني.</p>
 </template>
 
 <!-- شاشة الشكر -->
@@ -58,6 +72,7 @@
     <h1>شكرًا لك</h1>
     <p>وصلتنا إجاباتك كاملة. كلامك بيغيّر شكل التطبيق فعليًا.</p>
     <button class="btn ghost" data-review>راجع إجاباتي</button>
+    <p class="code-note">كود المتابعة: <strong data-code-badge></strong></p>
   </div>
 </template>
 
