@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS questions (
   categories TEXT    NOT NULL DEFAULT '[]',
   options    TEXT    NOT NULL DEFAULT '[]',
   required   INTEGER NOT NULL DEFAULT 0,
-  deleted    INTEGER NOT NULL DEFAULT 0
+  deleted    INTEGER NOT NULL DEFAULT 0,
+  from_catalog INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -100,6 +101,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_code ON sessions(code) WHERE code
 // فنتجاهل خطأ العمود المكرّر عند التشغيل على قاعدة مُرقّاة أصلًا.
 var addedColumns = []string{
 	`ALTER TABLE sessions ADD COLUMN code TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE questions ADD COLUMN from_catalog INTEGER NOT NULL DEFAULT 0`,
 }
 
 func (s *Store) migrate() error {
@@ -114,7 +116,29 @@ func (s *Store) migrate() error {
 	if _, err := s.db.Exec(indexes); err != nil {
 		return fmt.Errorf("إنشاء الفهارس: %w", err)
 	}
+	if err := s.backfillCatalogFlag(); err != nil {
+		return err
+	}
 	return s.backfillCodes()
+}
+
+const keyCatalogFlagDone = "catalog_flag_backfilled"
+
+// backfillCatalogFlag يعلّم الأسئلة السابقة لإضافة العمود بأنها من الكتالوج،
+// وإلا نجت من التعطيل عند تغيّره وبقيت معروضة إلى الأبد. يُنفَّذ مرة واحدة
+// فقط، فالأسئلة المضافة من اللوحة بعد هذه النقطة تبقى مميّزة ومحمية.
+func (s *Store) backfillCatalogFlag() error {
+	done, err := s.Setting(keyCatalogFlagDone, "0")
+	if err != nil {
+		return err
+	}
+	if done == "1" {
+		return nil
+	}
+	if _, err := s.db.Exec(`UPDATE questions SET from_catalog = 1`); err != nil {
+		return fmt.Errorf("توسيم أسئلة الكتالوج السابقة: %w", err)
+	}
+	return s.SetSetting(keyCatalogFlagDone, "1")
 }
 
 // backfillCodes يمنح الجلسات القديمة أكواد متابعة حتى تعمل لها ميزة الاستئناف.
@@ -199,16 +223,17 @@ func (s *Store) MarkSeeded() error { return s.SetSetting(keySeeded, "1") }
 
 func scanQuestion(sc interface{ Scan(...any) error }) (model.Question, error) {
 	var (
-		q            model.Question
-		catsJSON     string
-		optsJSON     string
-		req, deleted int
+		q                     model.Question
+		catsJSON              string
+		optsJSON              string
+		req, deleted, catalog int
 	)
-	if err := sc.Scan(&q.ID, &q.Text, &q.Kind, &q.Section, &q.Position, &catsJSON, &optsJSON, &req, &deleted); err != nil {
+	if err := sc.Scan(&q.ID, &q.Text, &q.Kind, &q.Section, &q.Position, &catsJSON, &optsJSON, &req, &deleted, &catalog); err != nil {
 		return q, err
 	}
 	q.Required = req == 1
 	q.Deleted = deleted == 1
+	q.FromCatalog = catalog == 1
 	if err := json.Unmarshal([]byte(catsJSON), &q.Categories); err != nil {
 		q.Categories = nil
 	}
@@ -224,7 +249,7 @@ func scanQuestion(sc interface{ Scan(...any) error }) (model.Question, error) {
 	return q, nil
 }
 
-const questionCols = `id, text, kind, section, position, categories, options, required, deleted`
+const questionCols = `id, text, kind, section, position, categories, options, required, deleted, from_catalog`
 
 // Questions يعيد كل الأسئلة مرتّبة. includeDeleted يشمل المحذوفة منطقيًا.
 func (s *Store) Questions(includeDeleted bool) ([]model.Question, error) {
@@ -286,9 +311,10 @@ func (s *Store) CreateQuestion(q model.Question) (int64, error) {
 		q.Position = int(maxPos.Int64) + 1
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO questions(text, kind, section, position, categories, options, required, deleted)
-		 VALUES(?, ?, ?, ?, ?, ?, ?, 0)`,
-		q.Text, string(q.Kind), q.Section, q.Position, string(cats), string(opts), boolInt(q.Required))
+		`INSERT INTO questions(text, kind, section, position, categories, options, required, deleted, from_catalog)
+		 VALUES(?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+		q.Text, string(q.Kind), q.Section, q.Position, string(cats), string(opts),
+		boolInt(q.Required), boolInt(q.FromCatalog))
 	if err != nil {
 		return 0, err
 	}
@@ -322,6 +348,97 @@ func (s *Store) DeleteQuestion(id int64) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// SyncCatalogQuestion يوحّد سؤال الكتالوج مع نسخته المخزَّنة: النوع والقسم
+// والفئات والخيارات. الكتالوج مصدر موثوق للمحتوى لا لحالة التفعيل، فعمود
+// deleted لا يُمسّ — وإلا ألغى كل نشر ما عطّله الأدمن من أقسام أو أسئلة.
+func (s *Store) SyncCatalogQuestion(id int64, q model.Question) error {
+	cats, _ := json.Marshal(nonNilCats(q.Categories))
+	opts, _ := json.Marshal(nonNilStrs(q.Options))
+	_, err := s.db.Exec(
+		`UPDATE questions
+		 SET kind = ?, section = ?, categories = ?, options = ?, required = ?,
+		     from_catalog = 1
+		 WHERE id = ?`,
+		string(q.Kind), q.Section, string(cats), string(opts), boolInt(q.Required), id)
+	return err
+}
+
+// RetireCatalogQuestions يعطّل أسئلة الكتالوج التي لم تعد فيه، دون أن يمسّ
+// الأسئلة المضافة يدويًا من اللوحة. الإجابات المجموعة تبقى.
+func (s *Store) RetireCatalogQuestions(keep map[int64]bool) (int64, error) {
+	rows, err := s.db.Query(`SELECT id FROM questions WHERE from_catalog = 1 AND deleted = 0`)
+	if err != nil {
+		return 0, err
+	}
+	var stale []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		if !keep[id] {
+			stale = append(stale, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	for _, id := range stale {
+		if _, err := s.db.Exec(`UPDATE questions SET deleted = 1 WHERE id = ?`, id); err != nil {
+			return 0, err
+		}
+	}
+	return int64(len(stale)), nil
+}
+
+// ---------- تفعيل الأدوار ----------
+
+const keyDisabledCategories = "disabled_categories"
+
+// DisabledCategories يعيد الأدوار المعطّلة التي لا تظهر للمشاركين.
+func (s *Store) DisabledCategories() (map[model.Category]bool, error) {
+	raw, err := s.Setting(keyDisabledCategories, "[]")
+	if err != nil {
+		return nil, err
+	}
+	var list []model.Category
+	if err := json.Unmarshal([]byte(raw), &list); err != nil {
+		return map[model.Category]bool{}, nil
+	}
+	out := make(map[model.Category]bool, len(list))
+	for _, c := range list {
+		out[c] = true
+	}
+	return out, nil
+}
+
+// SetCategoryEnabled يفعّل دورًا أو يعطّله. الدور المعطّل لا يظهر في شاشة
+// اختيار الفئة ولا تُقبل جلسات جديدة له، وأسئلته الخاصة به تختفي تبعًا.
+func (s *Store) SetCategoryEnabled(c model.Category, enabled bool) error {
+	disabled, err := s.DisabledCategories()
+	if err != nil {
+		return err
+	}
+	if enabled {
+		delete(disabled, c)
+	} else {
+		disabled[c] = true
+	}
+	list := []model.Category{}
+	for _, cat := range model.AllCategories {
+		if disabled[cat] {
+			list = append(list, cat)
+		}
+	}
+	b, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	return s.SetSetting(keyDisabledCategories, string(b))
 }
 
 // SetSectionActive يفعّل قسمًا كاملًا أو يعطّله، ليُشغَّل الاستبيان الطويل

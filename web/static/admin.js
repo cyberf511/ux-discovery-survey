@@ -272,6 +272,8 @@
   // ---------- تبويب الأقسام ----------
 
   function buildSectionsTab(root) {
+    buildRolesList(root);
+
     var list = root.querySelector("[data-sections-list]");
     var summary = root.querySelector("[data-sec-summary]");
     if (!list) return;
@@ -317,6 +319,55 @@
     root.querySelector("[data-sec-all]").addEventListener("click", function () {
       bulkSections(true);
     });
+  }
+
+  // عدد الأسئلة الخاصة بدور: ما يراه هذا الدور ولا تراه بقية الأدوار.
+  function exclusiveCount(value) {
+    var n = 0;
+    st.questions.forEach(function (q) {
+      if (q.categories && q.categories.length === 1 && q.categories[0] === value) n++;
+    });
+    return n;
+  }
+
+  function buildRolesList(root) {
+    var box = root.querySelector("[data-roles-list]");
+    if (!box) return;
+
+    var table = el("table");
+    var head = el("tr");
+    ["الدور", "أسئلته الخاصة", "الحالة", ""].forEach(function (t) {
+      head.appendChild(el("th", null, t));
+    });
+    table.appendChild(head);
+
+    st.categories.forEach(function (c) {
+      var tr = el("tr");
+      tr.appendChild(el("td", null, c.label));
+      tr.appendChild(el("td", null, String(exclusiveCount(c.value))));
+      var status = el("td");
+      status.appendChild(el("span", "chip", c.enabled ? "مفعّل" : "معطّل"));
+      tr.appendChild(status);
+      var act = el("td");
+      var b = el("button", "btn ghost", c.enabled ? "تعطيل الدور" : "تشغيل الدور");
+      b.style.minHeight = "36px";
+      b.addEventListener("click", function () { toggleCategory(c, !c.enabled); });
+      act.appendChild(b);
+      tr.appendChild(act);
+      if (!c.enabled) tr.style.opacity = ".55";
+      table.appendChild(tr);
+    });
+
+    box.textContent = "";
+    box.appendChild(table);
+  }
+
+  function toggleCategory(cat, enabled) {
+    if (!enabled && !confirm("تعطيل دور «" + cat.label + "»؟\n\nلن يظهر للمشاركين ولن تُقبل جلسات جديدة له. الإجابات المجموعة تبقى.")) return;
+    activeTab = "sections";
+    api("POST", "/api/admin/categories/toggle", { category: cat.value, enabled: enabled })
+      .then(load)
+      .catch(function (e) { alert(e.message); });
   }
 
   function toggleSection(name, active) {

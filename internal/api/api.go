@@ -65,6 +65,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("DELETE /api/admin/questions/{id}", s.auth(http.HandlerFunc(s.handleDeleteQuestion)))
 	mux.Handle("POST /api/admin/questions/reorder", s.auth(http.HandlerFunc(s.handleReorder)))
 	mux.Handle("POST /api/admin/sections/toggle", s.auth(http.HandlerFunc(s.handleToggleSection)))
+	mux.Handle("POST /api/admin/categories/toggle", s.auth(http.HandlerFunc(s.handleToggleCategory)))
 	mux.Handle("POST /api/admin/questions/import", s.auth(http.HandlerFunc(s.handleImport)))
 	mux.Handle("POST /api/admin/open", s.auth(http.HandlerFunc(s.handleSetOpen)))
 	mux.Handle("GET /api/admin/results", s.auth(http.HandlerFunc(s.handleResults)))
@@ -94,8 +95,30 @@ func (s *Server) page(name string) http.HandlerFunc {
 // ---------- واجهة المشارك ----------
 
 type categoryInfo struct {
-	Value model.Category `json:"value"`
-	Label string         `json:"label"`
+	Value   model.Category `json:"value"`
+	Label   string         `json:"label"`
+	Enabled bool           `json:"enabled"`
+}
+
+// categories يبني قائمة الأدوار. includeDisabled للوحة الإدارة فقط؛
+// المشارك لا يرى الأدوار المعطّلة أصلًا.
+func (s *Server) categories(includeDisabled bool) ([]categoryInfo, error) {
+	disabled, err := s.st.DisabledCategories()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]categoryInfo, 0, len(model.AllCategories))
+	for _, c := range model.AllCategories {
+		if disabled[c] && !includeDisabled {
+			continue
+		}
+		out = append(out, categoryInfo{
+			Value:   c,
+			Label:   model.CategoryLabel(c),
+			Enabled: !disabled[c],
+		})
+	}
+	return out, nil
 }
 
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
@@ -104,9 +127,10 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	cats := make([]categoryInfo, 0, len(model.AllCategories))
-	for _, c := range model.AllCategories {
-		cats = append(cats, categoryInfo{Value: c, Label: model.CategoryLabel(c)})
+	cats, err := s.categories(false)
+	if err != nil {
+		fail(w, err)
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"open": open, "categories": cats})
 }
@@ -121,6 +145,15 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	if !model.ValidCategory(body.Category) {
 		writeError(w, http.StatusBadRequest, "فئة غير معروفة")
+		return
+	}
+	disabled, err := s.st.DisabledCategories()
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if disabled[body.Category] {
+		writeError(w, http.StatusConflict, "هذا الدور غير مفعّل في الاستبيان حاليًا")
 		return
 	}
 	sess, err := s.st.CreateSession(body.Category, strings.TrimSpace(body.Name))

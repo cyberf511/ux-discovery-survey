@@ -248,6 +248,50 @@ func TestToggleSectionHidesQuestionsButKeepsAnswers(t *testing.T) {
 	}
 }
 
+// الدور المعطّل يختفي من شاشة اختيار الفئة ولا تُقبل جلسات جديدة له.
+func TestDisabledCategoryIsHiddenAndRejected(t *testing.T) {
+	srv, _ := newTestServer(t)
+	admin := loginClient(t, srv)
+
+	res, out := do(t, admin, "POST", srv.URL+"/api/admin/categories/toggle",
+		map[string]any{"category": "company_manager", "enabled": false})
+	if res.StatusCode != 200 {
+		t.Fatalf("تعطيل الدور فشل: %d %v", res.StatusCode, out)
+	}
+
+	_, meta := do(t, srv.Client(), "GET", srv.URL+"/api/meta", nil)
+	cats, _ := meta["categories"].([]any)
+	if len(cats) != len(model.AllCategories)-1 {
+		t.Fatalf("توقعنا %d أدوار للمشارك، وجدنا %d", len(model.AllCategories)-1, len(cats))
+	}
+	for _, c := range cats {
+		if m, ok := c.(map[string]any); ok && m["value"] == "company_manager" {
+			t.Fatalf("الدور المعطّل ما زال يظهر للمشارك")
+		}
+	}
+
+	res, _ = do(t, srv.Client(), "POST", srv.URL+"/api/sessions",
+		map[string]string{"category": "company_manager"})
+	if res.StatusCode != http.StatusConflict {
+		t.Fatalf("توقعنا 409 لدور معطّل، وجدنا %d", res.StatusCode)
+	}
+
+	// اللوحة ترى كل الأدوار مع حالتها لتستطيع إعادة التشغيل.
+	_, state := do(t, admin, "GET", srv.URL+"/api/admin/state", nil)
+	adminCats, _ := state["categories"].([]any)
+	if len(adminCats) != len(model.AllCategories) {
+		t.Fatalf("اللوحة يجب أن ترى كل الأدوار: %d", len(adminCats))
+	}
+
+	do(t, admin, "POST", srv.URL+"/api/admin/categories/toggle",
+		map[string]any{"category": "company_manager", "enabled": true})
+	res, _ = do(t, srv.Client(), "POST", srv.URL+"/api/sessions",
+		map[string]string{"category": "company_manager"})
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("إعادة تشغيل الدور لم تعمل: %d", res.StatusCode)
+	}
+}
+
 func TestUnknownCategoryRejected(t *testing.T) {
 	srv, _ := newTestServer(t)
 	res, _ := do(t, srv.Client(), "POST", srv.URL+"/api/sessions",

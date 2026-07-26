@@ -87,9 +87,10 @@ func (s *Server) handleAdminState(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	cats := make([]categoryInfo, 0, len(model.AllCategories))
-	for _, c := range model.AllCategories {
-		cats = append(cats, categoryInfo{Value: c, Label: model.CategoryLabel(c)})
+	cats, err := s.categories(true)
+	if err != nil {
+		fail(w, err)
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"questions":  questions,
@@ -213,6 +214,27 @@ func (s *Server) handleReorder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleToggleCategory يفعّل دورًا أو يعطّله. الدور المعطّل يختفي من شاشة
+// اختيار الفئة، وتختفي أسئلته معه لأنها موسومة به وحده.
+func (s *Server) handleToggleCategory(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Category model.Category `json:"category"`
+		Enabled  bool           `json:"enabled"`
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	if !model.ValidCategory(body.Category) {
+		writeError(w, http.StatusBadRequest, "فئة غير معروفة")
+		return
+	}
+	if err := s.st.SetCategoryEnabled(body.Category, body.Enabled); err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"category": body.Category, "enabled": body.Enabled})
 }
 
 // handleToggleSection يفعّل قسمًا كاملًا أو يعطّله لتشغيل الاستبيان على موجات.

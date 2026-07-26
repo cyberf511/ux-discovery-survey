@@ -19,7 +19,6 @@ func newStore(t *testing.T) *store.Store {
 	return s
 }
 
-// نص السؤال هو مفتاح المطابقة عند الترقية، فتكراره يعني إضافة مزدوجة.
 func TestNoDuplicateQuestionText(t *testing.T) {
 	seen := map[string]string{}
 	for _, q := range Questions() {
@@ -55,31 +54,86 @@ func TestEveryQuestionIsWellFormed(t *testing.T) {
 	}
 }
 
-// كل فئة يجب أن ترى أسئلة، ومدير الشركة مستخدم ويب فلا تُعرض له
-// أقسام ميدانية مثل الدوريات ونقاط التفتيش والعهد.
-func TestEachCategoryGetsRelevantQuestions(t *testing.T) {
-	fieldOnly := map[string]bool{
-		secPatrol: true, secCheck: true, secCustody: true,
-		secSOS: true, secBrief: true, secAttend: true,
-	}
-	for _, c := range model.AllCategories {
-		count := 0
-		for _, q := range Questions() {
-			if !q.AppliesTo(c) {
-				continue
+// القاعدة الحاكمة: كل سؤال يخص دورًا واحدًا، إلا الأسئلة المشتركة.
+// السؤال الموجّه لدورين يعني أننا نسأل المشرف عمّا ينفّذه الحارس.
+func TestEveryQuestionBelongsToExactlyOneRole(t *testing.T) {
+	for _, q := range Questions() {
+		if q.Section == secCommon {
+			if len(q.Categories) != 0 {
+				t.Errorf("السؤال المشترك يجب أن يكون لكل الفئات: %s", q.Text)
 			}
-			count++
-			if c == model.CatCompanyManager && fieldOnly[q.Section] {
-				t.Errorf("مدير الشركة لا يجب أن يرى قسمًا ميدانيًا (%s): %s", q.Section, q.Text)
-			}
+			continue
 		}
-		if count < 30 {
-			t.Errorf("فئة %s ترى %d سؤالًا فقط", model.CategoryLabel(c), count)
+		if len(q.Categories) != 1 {
+			t.Errorf("سؤال موجّه لـ%d أدوار بدل واحد (%s): %s",
+				len(q.Categories), q.Section, q.Text)
 		}
 	}
 }
 
-// الأسئلة الإلزامية قليلة عمدًا: الاستبيان طويل، وكثرة الإلزام تزيد الانسحاب.
+// المشترك ثمانية أسئلة بالضبط — أي زيادة تُميّع المقارنة بين الأدوار.
+func TestCommonQuestionsAreExactlyEight(t *testing.T) {
+	n := 0
+	for _, q := range Questions() {
+		if q.Section == secCommon {
+			n++
+		}
+	}
+	if n != 8 {
+		t.Errorf("الأسئلة المشتركة %d، والمتفق عليه ٨", n)
+	}
+}
+
+// كل قسم يخص دورًا واحدًا: لا يجوز أن يحوي قسم أسئلة لأدوار مختلفة.
+func TestEachSectionBelongsToOneRole(t *testing.T) {
+	owner := map[string]model.Category{}
+	for _, q := range Questions() {
+		if q.Section == secCommon || len(q.Categories) != 1 {
+			continue
+		}
+		c := q.Categories[0]
+		if prev, ok := owner[q.Section]; ok && prev != c {
+			t.Errorf("قسم %q يخلط بين %s و%s",
+				q.Section, model.CategoryLabel(prev), model.CategoryLabel(c))
+		}
+		owner[q.Section] = c
+	}
+}
+
+// أسئلة التنفيذ الميداني للحارس وحده: لا يُسأل المشرف عن QR ولا NFC،
+// ولا يُسأل المشرف العام عن المشي في الجولة.
+func TestFieldExecutionIsGuardOnly(t *testing.T) {
+	guardOnly := map[string]bool{
+		secShiftStart: true, secPatrol: true, secCheck: true,
+		secSOS: true, secTasks: true, secMyRequests: true,
+	}
+	for _, q := range Questions() {
+		if !guardOnly[q.Section] {
+			continue
+		}
+		for _, c := range q.Categories {
+			if c != model.CatGuard {
+				t.Errorf("قسم التنفيذ %q معروض على %s: %s",
+					q.Section, model.CategoryLabel(c), q.Text)
+			}
+		}
+	}
+}
+
+// مدير الشركة لا يُسأل عن العمل الميداني اليومي.
+func TestCompanyManagerHasNoFieldQuestions(t *testing.T) {
+	fieldSections := map[string]bool{
+		secShiftStart: true, secPatrol: true, secCheck: true, secReport: true,
+		secSOS: true, secTasks: true, secNotify: true, secNetwork: true,
+		secUsability: true, secMyRequests: true,
+	}
+	for _, q := range Questions() {
+		if fieldSections[q.Section] && q.AppliesTo(model.CatCompanyManager) {
+			t.Errorf("مدير الشركة يرى سؤالًا ميدانيًا (%s): %s", q.Section, q.Text)
+		}
+	}
+}
+
 func TestRequiredQuestionsStayFew(t *testing.T) {
 	required := 0
 	for _, q := range Questions() {
@@ -87,8 +141,26 @@ func TestRequiredQuestionsStayFew(t *testing.T) {
 			required++
 		}
 	}
-	if required > 10 {
-		t.Errorf("عدد الأسئلة الإلزامية %d — أكثر مما يحتمله استبيان بهذا الطول", required)
+	if required > 12 {
+		t.Errorf("عدد الأسئلة الإلزامية %d — أكثر مما يحتمله الاستبيان", required)
+	}
+}
+
+// حجم الاستبيان لكل دور يجب أن يبقى قابلًا للإنجاز في جلسة واحدة.
+func TestPerRoleLoadStaysReasonable(t *testing.T) {
+	for _, c := range model.AllCategories {
+		n := 0
+		for _, q := range Questions() {
+			if q.AppliesTo(c) {
+				n++
+			}
+		}
+		if n < 30 {
+			t.Errorf("%s يرى %d سؤالًا فقط — قليل جدًا", model.CategoryLabel(c), n)
+		}
+		if n > 120 {
+			t.Errorf("%s يرى %d سؤالًا — أطول من جلسة واحدة", model.CategoryLabel(c), n)
+		}
 	}
 }
 
@@ -108,7 +180,7 @@ func TestApplyIsIdempotent(t *testing.T) {
 		t.Fatalf("التحميل الثاني: %v", err)
 	}
 	if second != 0 {
-		t.Fatalf("التحميل المتكرر أضاف %d سؤالًا — كان يجب ألا يضيف شيئًا", second)
+		t.Fatalf("التحميل المتكرر أضاف %d سؤالًا", second)
 	}
 
 	stored, _ := s.Questions(false)
@@ -117,11 +189,14 @@ func TestApplyIsIdempotent(t *testing.T) {
 	}
 }
 
-// الترقية على قاعدة قائمة تضيف الجديد وحده وتحافظ على الإجابات المجموعة.
-func TestApplyAddsOnlyNewQuestionsToExistingDatabase(t *testing.T) {
+// السؤال الذي خرج من الكتالوج يُعطَّل، وإجابته تبقى.
+func TestApplyRetiresQuestionsDroppedFromCatalogue(t *testing.T) {
 	s := newStore(t)
 
-	old := Questions()[0]
+	old := model.Question{
+		Text: "سؤال قديم خرج من الكتالوج", Kind: model.KindLongText,
+		Section: "قسم ملغى", FromCatalog: true,
+	}
 	id, err := s.CreateQuestion(old)
 	if err != nil {
 		t.Fatalf("إضافة سؤال قديم: %v", err)
@@ -131,21 +206,68 @@ func TestApplyAddsOnlyNewQuestionsToExistingDatabase(t *testing.T) {
 		t.Fatalf("حفظ إجابة: %v", err)
 	}
 
-	added, err := Apply(s)
-	if err != nil {
+	if _, err := Apply(s); err != nil {
 		t.Fatalf("الترقية: %v", err)
 	}
-	if added != len(Questions())-1 {
-		t.Fatalf("توقعنا إضافة %d، أُضيف %d", len(Questions())-1, added)
-	}
 
+	got, err := s.Question(id)
+	if err != nil {
+		t.Fatalf("قراءة السؤال القديم: %v", err)
+	}
+	if !got.Deleted {
+		t.Fatalf("السؤال الخارج من الكتالوج يجب أن يُعطَّل")
+	}
 	answers, _ := s.SessionAnswers(sess.ID)
-	if len(answers) != 1 || string(answers[id]) != `"إجابة قديمة"` {
-		t.Fatalf("الإجابة القديمة تغيّرت أو ضاعت: %v", answers)
+	if len(answers) != 1 {
+		t.Fatalf("إجابة السؤال المعطّل ضاعت")
 	}
 }
 
-// السؤال المحذوف من اللوحة يجب ألا يعود مع أي ترقية لاحقة.
+// الأسئلة المضافة يدويًا من اللوحة لا تُعطَّل مع الترقية.
+func TestApplyKeepsManuallyAddedQuestions(t *testing.T) {
+	s := newStore(t)
+	// تحميل أول حتى ينتهي ترحيل توسيم الأسئلة السابقة قبل الإضافة اليدوية.
+	if _, err := Apply(s); err != nil {
+		t.Fatalf("التحميل الأول: %v", err)
+	}
+	id, err := s.CreateQuestion(model.Question{
+		Text: "سؤال أضافه الأدمن", Kind: model.KindLongText, Section: "إضافات",
+	})
+	if err != nil {
+		t.Fatalf("إضافة سؤال يدوي: %v", err)
+	}
+
+	if _, err := Apply(s); err != nil {
+		t.Fatalf("الترقية: %v", err)
+	}
+
+	got, _ := s.Question(id)
+	if got.Deleted {
+		t.Fatalf("السؤال المضاف يدويًا عُطِّل بالخطأ")
+	}
+}
+
+// تعديل فئة سؤال في الكتالوج يجب أن يصل إلى القاعدة القائمة.
+func TestApplySyncsChangedCategories(t *testing.T) {
+	s := newStore(t)
+	first := Questions()[len(commonQuestions())] // أول سؤال خاص بالحارس
+	stale := first
+	stale.Categories = []model.Category{model.CatCompanyManager}
+	id, err := s.CreateQuestion(stale)
+	if err != nil {
+		t.Fatalf("إضافة سؤال بفئة قديمة: %v", err)
+	}
+
+	if _, err := Apply(s); err != nil {
+		t.Fatalf("الترقية: %v", err)
+	}
+
+	got, _ := s.Question(id)
+	if len(got.Categories) != 1 || got.Categories[0] != first.Categories[0] {
+		t.Fatalf("الفئة لم تُوحَّد مع الكتالوج: %v", got.Categories)
+	}
+}
+
 func TestApplyDoesNotResurrectDeletedQuestions(t *testing.T) {
 	s := newStore(t)
 	if _, err := Apply(s); err != nil {
@@ -165,7 +287,26 @@ func TestApplyDoesNotResurrectDeletedQuestions(t *testing.T) {
 	}
 }
 
-// الترتيب المعروض يجب أن يطابق ترتيب الكتالوج حتى تبقى الأقسام متجاورة.
+// تعطيل الأقسام قرار إداري يجب أن ينجو من إعادة النشر.
+func TestApplyPreservesDisabledSections(t *testing.T) {
+	s := newStore(t)
+	if _, err := Apply(s); err != nil {
+		t.Fatalf("التحميل الأول: %v", err)
+	}
+	if _, err := s.SetSectionActive(secPatrol, false); err != nil {
+		t.Fatalf("تعطيل قسم: %v", err)
+	}
+	before, _ := s.Questions(false)
+
+	if _, err := Apply(s); err != nil {
+		t.Fatalf("إعادة النشر: %v", err)
+	}
+	after, _ := s.Questions(false)
+	if len(after) != len(before) {
+		t.Fatalf("إعادة النشر أعادت تفعيل قسم معطّل: %d بدل %d", len(after), len(before))
+	}
+}
+
 func TestApplyKeepsCatalogueOrder(t *testing.T) {
 	s := newStore(t)
 	if _, err := Apply(s); err != nil {

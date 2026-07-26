@@ -81,6 +81,9 @@ type Question struct {
 	Options    []string   `json:"options"`
 	Required   bool       `json:"required"`
 	Deleted    bool       `json:"deleted"`
+	// FromCatalog يميّز أسئلة الكتالوج عن المضافة يدويًا من اللوحة،
+	// فتُعطَّل تلقائيًا عند خروجها من الكتالوج بلا مساس بالمضاف يدويًا.
+	FromCatalog bool `json:"from_catalog"`
 }
 
 // AppliesTo يحدد ما إذا كان السؤال موجّهًا لهذه الفئة.
