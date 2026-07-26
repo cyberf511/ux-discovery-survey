@@ -324,6 +324,51 @@ func (s *Store) DeleteQuestion(id int64) error {
 	return nil
 }
 
+// SetSectionActive يفعّل قسمًا كاملًا أو يعطّله، ليُشغَّل الاستبيان الطويل
+// على موجات قصيرة بدل عرض كل الأقسام على المشارك دفعة واحدة.
+// التعطيل حذف منطقي، فالإجابات المجموعة تبقى في النتائج والتصدير.
+func (s *Store) SetSectionActive(section string, active bool) (int64, error) {
+	res, err := s.db.Exec(`UPDATE questions SET deleted = ? WHERE section = ?`,
+		boolInt(!active), section)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// Sections يعيد أقسام الأسئلة بترتيب ظهورها مع عدد أسئلة كل قسم وحالته.
+func (s *Store) Sections() ([]Section, error) {
+	rows, err := s.db.Query(
+		`SELECT section, COUNT(*), SUM(CASE WHEN deleted = 0 THEN 1 ELSE 0 END), MIN(position)
+		 FROM questions GROUP BY section ORDER BY MIN(position)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Section{}
+	for rows.Next() {
+		var (
+			sec           Section
+			total, active int
+			pos           int
+		)
+		if err := rows.Scan(&sec.Name, &total, &active, &pos); err != nil {
+			return nil, err
+		}
+		sec.Total = total
+		sec.Active = active
+		out = append(out, sec)
+	}
+	return out, rows.Err()
+}
+
+// Section ملخّص قسم أسئلة.
+type Section struct {
+	Name   string `json:"name"`
+	Total  int    `json:"total"`
+	Active int    `json:"active"`
+}
+
 // ReorderQuestions يعيد ترتيب الأسئلة حسب تسلسل المعرّفات المعطى.
 func (s *Store) ReorderQuestions(ids []int64) error {
 	tx, err := s.db.Begin()

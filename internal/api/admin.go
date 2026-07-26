@@ -72,6 +72,11 @@ func (s *Server) handleAdminState(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	sections, err := s.st.Sections()
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	stats, err := s.st.CategoryStats()
 	if err != nil {
 		fail(w, err)
@@ -88,6 +93,7 @@ func (s *Server) handleAdminState(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"questions":  questions,
+		"sections":   sections,
 		"stats":      stats,
 		"open":       open,
 		"categories": cats,
@@ -207,6 +213,27 @@ func (s *Server) handleReorder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleToggleSection يفعّل قسمًا كاملًا أو يعطّله لتشغيل الاستبيان على موجات.
+func (s *Server) handleToggleSection(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Section string `json:"section"`
+		Active  bool   `json:"active"`
+	}
+	if !readJSON(w, r, &body) {
+		return
+	}
+	if strings.TrimSpace(body.Section) == "" {
+		writeError(w, http.StatusBadRequest, "اسم القسم مطلوب")
+		return
+	}
+	n, err := s.st.SetSectionActive(body.Section, body.Active)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"affected": n})
 }
 
 // handleImport يستورد دفعة أسئلة نصية: سطر يبدأ بـ ## يصبح عنوان قسم، وكل سطر آخر سؤال نصّي طويل.

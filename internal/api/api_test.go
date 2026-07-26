@@ -191,6 +191,63 @@ func TestLeaveSessionKeepsAnswers(t *testing.T) {
 	}
 }
 
+// تعطيل قسم يخفي أسئلته عن المشاركين ويُبقي الإجابات المجموعة عليها.
+func TestToggleSectionHidesQuestionsButKeepsAnswers(t *testing.T) {
+	srv, st := newTestServer(t)
+	qid, _ := st.CreateQuestion(model.Question{
+		Text: "سؤال مالي", Kind: model.KindLongText, Section: "المالية والفوترة والعقود",
+	})
+	st.CreateQuestion(model.Question{Text: "سؤال ميداني", Kind: model.KindLongText, Section: "الدوريات"})
+	sess, _ := st.CreateSession(model.CatGuard, "فيصل")
+	st.SaveAnswer(sess.ID, qid, json.RawMessage(`"إجابة سابقة"`))
+
+	admin := loginClient(t, srv)
+	res, out := do(t, admin, "POST", srv.URL+"/api/admin/sections/toggle",
+		map[string]any{"section": "المالية والفوترة والعقود", "active": false})
+	if res.StatusCode != 200 {
+		t.Fatalf("تعطيل القسم فشل: %d %v", res.StatusCode, out)
+	}
+	if out["affected"] != float64(1) {
+		t.Fatalf("توقعنا تعطيل سؤال واحد، تأثّر %v", out["affected"])
+	}
+
+	// المشارك ما عاد يرى السؤال المعطّل.
+	_, view := do(t, srv.Client(), "GET", srv.URL+"/api/sessions/"+sess.ID, nil)
+	questions, _ := view["questions"].([]any)
+	for _, q := range questions {
+		if m, ok := q.(map[string]any); ok && m["section"] == "المالية والفوترة والعقود" {
+			t.Fatalf("السؤال المعطّل ما زال يظهر للمشارك")
+		}
+	}
+	if len(questions) != 1 {
+		t.Fatalf("توقعنا سؤالًا واحدًا فعّالًا، وجدنا %d", len(questions))
+	}
+
+	// والإجابة السابقة باقية وتظهر في التصدير.
+	answers, _ := st.SessionAnswers(sess.ID)
+	if len(answers) != 1 {
+		t.Fatalf("الإجابة على السؤال المعطّل ضاعت")
+	}
+	csv, err := admin.Get(srv.URL + "/api/admin/export.csv")
+	if err != nil {
+		t.Fatalf("التصدير: %v", err)
+	}
+	defer csv.Body.Close()
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(csv.Body)
+	if !strings.Contains(buf.String(), "إجابة سابقة") {
+		t.Fatalf("إجابة القسم المعطّل يجب أن تبقى في التصدير")
+	}
+
+	// وإعادة التشغيل تعيد الأسئلة كما كانت.
+	do(t, admin, "POST", srv.URL+"/api/admin/sections/toggle",
+		map[string]any{"section": "المالية والفوترة والعقود", "active": true})
+	_, view = do(t, srv.Client(), "GET", srv.URL+"/api/sessions/"+sess.ID, nil)
+	if q, _ := view["questions"].([]any); len(q) != 2 {
+		t.Fatalf("إعادة تشغيل القسم لم تُعد أسئلته: %d", len(q))
+	}
+}
+
 func TestUnknownCategoryRejected(t *testing.T) {
 	srv, _ := newTestServer(t)
 	res, _ := do(t, srv.Client(), "POST", srv.URL+"/api/sessions",

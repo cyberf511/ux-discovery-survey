@@ -38,6 +38,7 @@
   <div class="tabs">
     <button class="tab" data-tab="results" aria-selected="true">النتائج</button>
     <button class="tab" data-tab="sessions" aria-selected="false">المشاركون</button>
+    <button class="tab" data-tab="sections" aria-selected="false">الأقسام</button>
     <button class="tab" data-tab="questions" aria-selected="false">الأسئلة</button>
     <button class="tab" data-tab="export" aria-selected="false">تصدير البيانات</button>
     <button class="tab" data-tab="settings" aria-selected="false">الإعدادات</button>
@@ -56,6 +57,23 @@
 
   <section class="panel" data-panel="sessions">
     <div class="card"><div data-sessions></div></div>
+  </section>
+
+  <section class="panel" data-panel="sections">
+    <div class="card">
+      <h3 style="margin-top:0">تشغيل الاستبيان على موجات</h3>
+      <p class="small">
+        الكتالوج كامل طويل جدًا على جلسة واحدة. عطّل الأقسام التي لا تريدها هذا الأسبوع،
+        ثم شغّلها لاحقًا في موجة ثانية. التعطيل يخفي الأسئلة عن المشاركين الجدد فقط —
+        الإجابات المجموعة تبقى في النتائج والتصدير.
+      </p>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn ghost" data-sec-none>تعطيل كل الأقسام</button>
+        <button class="btn ghost" data-sec-all>تشغيل كل الأقسام</button>
+        <span class="small" data-sec-summary></span>
+      </div>
+      <div data-sections-list></div>
+    </div>
   </section>
 
   <section class="panel" data-panel="questions">

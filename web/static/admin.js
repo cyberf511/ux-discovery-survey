@@ -3,7 +3,7 @@
   "use strict";
 
   var app = document.getElementById("app");
-  var st = { questions: [], stats: [], open: true, categories: [] };
+  var st = { questions: [], sections: [], stats: [], open: true, categories: [] };
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -81,6 +81,7 @@
   function load() {
     return api("GET", "/api/admin/state").then(function (data) {
       st.questions = data.questions;
+      st.sections = data.sections || [];
       st.stats = data.stats;
       st.open = data.open;
       st.categories = data.categories;
@@ -134,6 +135,7 @@
       else p.removeAttribute("data-active");
     });
 
+    buildSectionsTab(node);
     buildQuestionsTab(node);
     buildExportTab(node);
     buildSettingsTab(node);
@@ -265,6 +267,76 @@
     var d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
     return d.toLocaleString("ar", { dateStyle: "short", timeStyle: "short" });
+  }
+
+  // ---------- تبويب الأقسام ----------
+
+  function buildSectionsTab(root) {
+    var list = root.querySelector("[data-sections-list]");
+    var summary = root.querySelector("[data-sec-summary]");
+    if (!list) return;
+
+    var activeQ = 0, totalQ = 0, activeSecs = 0;
+    st.sections.forEach(function (s) {
+      activeQ += s.active;
+      totalQ += s.total;
+      if (s.active > 0) activeSecs++;
+    });
+    summary.textContent = activeSecs + " من " + st.sections.length + " أقسام مفعّلة — " +
+      activeQ + " سؤالًا من " + totalQ + " تظهر للمشاركين";
+
+    var table = el("table");
+    var head = el("tr");
+    ["القسم", "الأسئلة", "الحالة", ""].forEach(function (t) { head.appendChild(el("th", null, t)); });
+    table.appendChild(head);
+
+    st.sections.forEach(function (sec) {
+      var on = sec.active > 0;
+      var tr = el("tr");
+      tr.appendChild(el("td", null, sec.name));
+      tr.appendChild(el("td", null, String(sec.total)));
+      var status = el("td");
+      status.appendChild(el("span", "chip", on ? "مفعّل" : "معطّل"));
+      tr.appendChild(status);
+      var act = el("td");
+      var b = el("button", "btn ghost", on ? "تعطيل" : "تشغيل");
+      b.style.minHeight = "36px";
+      b.addEventListener("click", function () { toggleSection(sec.name, !on); });
+      act.appendChild(b);
+      tr.appendChild(act);
+      if (!on) tr.style.opacity = ".55";
+      table.appendChild(tr);
+    });
+
+    list.textContent = "";
+    list.appendChild(table);
+
+    root.querySelector("[data-sec-none]").addEventListener("click", function () {
+      bulkSections(false);
+    });
+    root.querySelector("[data-sec-all]").addEventListener("click", function () {
+      bulkSections(true);
+    });
+  }
+
+  function toggleSection(name, active) {
+    activeTab = "sections";
+    api("POST", "/api/admin/sections/toggle", { section: name, active: active })
+      .then(load)
+      .catch(function (e) { alert(e.message); });
+  }
+
+  function bulkSections(active) {
+    var what = active ? "تشغيل" : "تعطيل";
+    if (!confirm(what + " كل الأقسام؟")) return;
+    activeTab = "sections";
+    var chain = Promise.resolve();
+    st.sections.forEach(function (sec) {
+      chain = chain.then(function () {
+        return api("POST", "/api/admin/sections/toggle", { section: sec.name, active: active });
+      });
+    });
+    chain.then(load).catch(function (e) { alert(e.message); });
   }
 
   // ---------- تبويب الأسئلة ----------

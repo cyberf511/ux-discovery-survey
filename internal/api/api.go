@@ -64,6 +64,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("PUT /api/admin/questions/{id}", s.auth(http.HandlerFunc(s.handleUpdateQuestion)))
 	mux.Handle("DELETE /api/admin/questions/{id}", s.auth(http.HandlerFunc(s.handleDeleteQuestion)))
 	mux.Handle("POST /api/admin/questions/reorder", s.auth(http.HandlerFunc(s.handleReorder)))
+	mux.Handle("POST /api/admin/sections/toggle", s.auth(http.HandlerFunc(s.handleToggleSection)))
 	mux.Handle("POST /api/admin/questions/import", s.auth(http.HandlerFunc(s.handleImport)))
 	mux.Handle("POST /api/admin/open", s.auth(http.HandlerFunc(s.handleSetOpen)))
 	mux.Handle("GET /api/admin/results", s.auth(http.HandlerFunc(s.handleResults)))
