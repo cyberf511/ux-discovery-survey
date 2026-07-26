@@ -71,39 +71,27 @@ func commonQuestions() []model.Question {
 
 // ---------- الحارس ----------
 
+// أقسام الحارس مختصرة عمدًا: الحارس يجيب واقفًا وسط وردية، فطول الاستبيان
+// نفسه يفسد نتيجته. أُبقي ما يحسم قرار تصميم، وحُذف ما يصف الحال دون أن يغيّر
+// شاشة — والمحذوف باقٍ في تاريخ الشيفرة إن احتجناه في موجة ثانية.
+
 func shiftStartQuestions() []model.Question {
 	return []model.Question{
-		q(secShiftStart, "ما أول شيء تفعله عند وصولك للموقع؟", model.KindLongText, guard, false),
 		q(secShiftStart, "كيف تسجل حضورك الآن؟", model.KindLongText, guard, false),
-		q(secShiftStart, "كم يستغرق تسجيل الحضور؟", model.KindSingleChoice, guard, false,
-			"أقل من ١٠ ثوانٍ", "من ١٠ إلى ٣٠ ثانية", "من ٣٠ ثانية إلى دقيقة", "أكثر من دقيقة"),
 		q(secShiftStart, "هل يحدث أن يرفض تسجيل الحضور؟ ولماذا؟", model.KindLongText, guard, false),
 		q(secShiftStart, "كيف تعرف أن حضورك تم بنجاح؟", model.KindLongText, guard, false),
 		q(secShiftStart, "إذا فشل التسجيل، ماذا تتوقع أن يحدث؟", model.KindLongText, guard, false),
-		q(secShiftStart, "هل سبق أن سُجّل غيابك وأنت حاضر فعلًا؟", model.KindBoolean, guard, false),
 		q(secShiftStart, "ما رأيك في تصوير وجهك لإثبات الحضور؟", model.KindSingleChoice, guard, false,
 			"عادي ولا يزعجني", "مقبول لكن أفضّل غيره", "يزعجني", "أرفضه"),
-		q(secShiftStart, "ما الذي يفشل عادة في تصوير الوجه؟ (إضاءة، كمامة، نظارة، كاميرا)", model.KindLongText, guard, false),
-		q(secShiftStart, "كيف تستلم الوردية من زميلك السابق؟", model.KindLongText, guard, false),
 		q(secShiftStart, "ما المعلومات التي يجب أن تعرفها من الوردية السابقة؟", model.KindLongText, guard, false),
-		q(secShiftStart, "هل تنسى تسجيل الانصراف أحيانًا؟ متى؟", model.KindLongText, guard, false),
-		q(secShiftStart, "ماذا تفعل لو لم يحضر بديلك في نهاية وردتك؟", model.KindLongText, guard, false),
 	}
 }
 
 func taskQuestions() []model.Question {
 	return []model.Question{
 		q(secTasks, "كيف تعرف ما هي مهامك اليوم؟", model.KindLongText, guard, false),
-		q(secTasks, "كم مهمة توكل إليك في الوردية عادة؟", model.KindSingleChoice, guard, false,
-			"لا شيء محدد", "من ١ إلى ٣", "من ٤ إلى ١٠", "أكثر من ١٠"),
-		q(secTasks, "ما أكثر مهمة تكررها كل يوم؟", model.KindLongText, guard, false),
 		q(secTasks, "هل يحدث أن تفوتك مهمة؟ ولماذا؟", model.KindLongText, guard, false),
 		q(secTasks, "كيف تعرف أي مهمة أهم من غيرها؟", model.KindLongText, guard, false),
-		q(secTasks, "ما الذي تحتاج معرفته عن المهمة قبل أن تبدأها؟", model.KindLongText, guard, false),
-		q(secTasks, "كيف تثبت أنك أنجزت المهمة؟", model.KindSingleChoice, guard, false,
-			"صورة", "توقيع", "الاثنان", "لا شيء"),
-		q(secTasks, "ماذا تفعل لو لم تستطع إنجاز مهمة موكلة إليك؟", model.KindLongText, guard, false),
-		q(secTasks, "ما أكثر شيء تنساه أثناء العمل؟", model.KindLongText, guard, false),
 		q(secTasks, "ما الأشياء التي تحفظها في رأسك وتتمنى أن يتذكرها التطبيق بدلًا عنك؟", model.KindLongText, guard, false),
 	}
 }
@@ -113,39 +101,23 @@ func patrolQuestions() []model.Question {
 		q(secPatrol, "كيف تعرف أين تذهب في الجولة؟", model.KindLongText, guard, false),
 		q(secPatrol, "كم جولة تنفّذ في الوردية الواحدة؟", model.KindSingleChoice, guard, false,
 			"جولة أو جولتان", "من ٣ إلى ٥", "من ٦ إلى ١٠", "أكثر من ١٠"),
-		q(secPatrol, "كم تستغرق الجولة الواحدة؟", model.KindSingleChoice, guard, false,
-			"أقل من ١٥ دقيقة", "من ١٥ إلى ٣٠ دقيقة", "من ٣٠ إلى ٦٠ دقيقة", "أكثر من ساعة"),
-		q(secPatrol, "هل مسار الجولة ثابت أم يتغيّر؟", model.KindSingleChoice, guard, false,
-			"ثابت دائمًا", "يتغيّر يوميًا", "أنا أقرّره", "يتغيّر حسب الحالة"),
-		q(secPatrol, "كيف تعرف أنك انتهيت من الجولة؟", model.KindLongText, guard, false),
 		q(secPatrol, "ماذا تحتاج أثناء المشي في الجولة؟", model.KindLongText, guard, false),
-		q(secPatrol, "هل تحتاج الخريطة طوال الجولة؟", model.KindBoolean, guard, false),
 		q(secPatrol, "هل تمشي والجوال في يدك أم تحفظه في جيبك؟", model.KindSingleChoice, guard, false,
 			"في يدي طوال الجولة", "أخرجه عند الحاجة فقط", "في جيبي غالبًا"),
 		q(secPatrol, "كيف تسجّل ملاحظاتك أثناء الجولة الآن؟", model.KindSingleChoice, guard, false,
 			"دفتر ورقي", "على الجوال", "أحفظها في ذهني", "لا أسجّل"),
 		q(secPatrol, "ماذا يحدث لو قاطعتك حالة طارئة في منتصف الجولة؟", model.KindLongText, guard, false),
-		q(secPatrol, "ماذا لو ضعت عن المسار؟", model.KindLongText, guard, false),
-		q(secPatrol, "ما الذي يجعلك تعيد جولة أو تتخطاها؟", model.KindLongText, guard, false),
 	}
 }
 
 func checkQuestions() []model.Question {
 	return []model.Question{
-		q(secCheck, "كم نقطة تفتيش في موقعك؟", model.KindSingleChoice, guard, false,
-			"أقل من ٥", "من ٥ إلى ١٠", "من ١٠ إلى ٢٠", "أكثر من ٢٠"),
 		q(secCheck, "كيف تثبت أنك وصلت للنقطة؟", model.KindLongText, guard, false),
 		q(secCheck, "أي وسيلة إثبات وصول تفضّل؟", model.KindSingleChoice, guard, false,
 			"QR", "NFC", "GPS", "لا يهم"),
-		q(secCheck, "أين تقع النقاط غالبًا؟", model.KindMultiChoice, guard, false,
-			"داخل مبنى", "في العراء", "مواقف سيارات", "أسطح أو أقبية"),
 		q(secCheck, "هل سبق أن واجهت مشكلة في إثبات الوصول؟ صفها.", model.KindLongText, guard, false),
 		q(secCheck, "ماذا تفعل لو لم تستطع إثبات وصولك لنقطة؟", model.KindLongText, guard, false),
-		q(secCheck, "كم ثانية مقبولة لتسجيل النقطة الواحدة؟", model.KindSingleChoice, guard, false,
-			"أقل من ٣ ثوانٍ", "من ٣ إلى ١٠ ثوانٍ", "أكثر من ١٠ ثوانٍ"),
 		q(secCheck, "ما أكثر شيء يبطئك عند نقاط التفتيش؟", model.KindLongText, guard, false),
-		q(secCheck, "هل تحتاج كتابة ملاحظة عند كل نقطة أم يكفي الإثبات؟", model.KindSingleChoice, guard, false,
-			"يكفي الإثبات", "ملاحظة عند الحاجة فقط", "ملاحظة في كل نقطة"),
 	}
 }
 
@@ -153,50 +125,31 @@ func reportQuestions() []model.Question {
 	return []model.Question{
 		q(secReport, "متى تنشئ بلاغًا؟", model.KindLongText, guard, false),
 		q(secReport, "ما أنواع البلاغات الأكثر شيوعًا عندك؟", model.KindLongText, guard, false),
-		q(secReport, "كم بلاغًا ترفع في الأسبوع تقريبًا؟", model.KindSingleChoice, guard, false,
-			"لا شيء غالبًا", "من ١ إلى ٣", "من ٤ إلى ١٠", "أكثر من ١٠"),
 		q(secReport, "كيف تفضّل تسجيل البلاغ؟", model.KindSingleChoice, guard, false,
 			"الكتابة", "الصوت", "الصور", "مزيج بينها"),
 		q(secReport, "كم تستغرق كتابة البلاغ الواحد الآن؟", model.KindSingleChoice, guard, false,
 			"أقل من دقيقة", "من ١ إلى ٣ دقائق", "من ٣ إلى ١٠ دقائق", "أكثر من ١٠ دقائق"),
-		q(secReport, "ما المعلومات التي يجب أن تُطلب منك في البلاغ؟", model.KindLongText, guard, false),
-		q(secReport, "ما المعلومات التي لا ينبغي أن تُطلب منك؟", model.KindLongText, guard, false),
-		q(secReport, "كم صورة ترفقها بالبلاغ عادة؟", model.KindSingleChoice, guard, false,
-			"لا أرفق صورًا", "صورة واحدة", "من ٢ إلى ٤", "أكثر من ٤"),
 		q(secReport, "ما الذي يمنعك أحيانًا من رفع بلاغ رغم وجود سبب؟", model.KindLongText, guard, false),
 		q(secReport, "ما الذي تحتاج معرفته بعد رفع البلاغ مباشرة؟", model.KindLongText, guard, false),
-		q(secReport, "كم تنتظر ردًا على بلاغك عادة؟", model.KindSingleChoice, guard, false,
-			"دقائق", "ساعات", "يوم أو أكثر", "لا يأتي رد غالبًا"),
 	}
 }
 
 func sosQuestions() []model.Question {
 	return []model.Question{
-		q(secSOS, "صف آخر موقف طارئ مررت به في العمل.", model.KindLongText, guard, false),
 		q(secSOS, "ماذا تفعل الآن عند وقوع خطر مباشر؟", model.KindLongText, guard, false),
 		q(secSOS, "كم ثانية تملك قبل أن يصبح طلب النجدة متأخرًا؟", model.KindSingleChoice, guard, false,
 			"أقل من ٥ ثوانٍ", "من ٥ إلى ١٥ ثانية", "من ١٥ إلى ٣٠ ثانية", "أكثر"),
 		q(secSOS, "هل تستطيع إخراج جوالك وفتحه أثناء الخطر؟", model.KindBoolean, guard, false),
-		q(secSOS, "هل تحتاج طلب النجدة بلا صوت أو بلا أن يراك أحد؟", model.KindBoolean, guard, false),
-		q(secSOS, "ما الذي يجب أن يصل للمشرف تلقائيًا عند استغاثتك؟", model.KindLongText, guard, false),
 		q(secSOS, "كيف تريد أن تتأكد أن الاستغاثة وصلت فعلًا؟", model.KindLongText, guard, false),
-		q(secSOS, "هل تخشى إطلاق استغاثة بالخطأ؟ وما الذي يطمئنك؟", model.KindLongText, guard, false),
 	}
 }
 
 func myRequestQuestions() []model.Question {
 	return []model.Question{
 		q(secMyRequests, "ما الطلبات التي تقدمها غالبًا؟ (إجازة، استئذان، سلفة...)", model.KindLongText, guard, false),
-		q(secMyRequests, "كم طلبًا تقدّم في الشهر تقريبًا؟", model.KindSingleChoice, guard, false,
-			"لا شيء غالبًا", "طلب أو طلبان", "من ٣ إلى ٥", "أكثر من ٥"),
-		q(secMyRequests, "ما المعلومات المطلوبة لكل طلب؟", model.KindLongText, guard, false),
 		q(secMyRequests, "كيف تعرف أن طلبك وصل؟", model.KindLongText, guard, false),
 		q(secMyRequests, "ماذا تريد أن ترى بعد إرسال الطلب؟", model.KindLongText, guard, false),
-		q(secMyRequests, "كم تنتظر الموافقة عادة؟", model.KindSingleChoice, guard, false,
-			"ساعات", "يوم أو يومان", "أسبوع", "أكثر من أسبوع"),
-		q(secMyRequests, "هل احتجت مرة إلغاء أو تعديل طلب بعد إرساله؟", model.KindBoolean, guard, false),
 		q(secMyRequests, "كيف تتابع راتبك ومستحقاتك اليوم؟", model.KindLongText, guard, false),
-		q(secMyRequests, "لو كان عليك جزاء أو خصم، ماذا تحتاج أن ترى؟", model.KindLongText, guard, false),
 	}
 }
 
@@ -204,28 +157,18 @@ func notifyQuestions() []model.Question {
 	return []model.Question{
 		q(secNotify, "ما الإشعارات المهمة بالنسبة لك؟", model.KindLongText, guard, false),
 		q(secNotify, "متى تعتبر الإشعار مزعجًا؟", model.KindLongText, guard, false),
-		q(secNotify, "كيف تميّز بين الإشعار العادي والعاجل؟", model.KindLongText, guard, false),
 		q(secNotify, "ما الذي يجب أن يظهر في الإشعار دون الحاجة لفتح التطبيق؟", model.KindLongText, guard, false),
-		q(secNotify, "كم إشعارًا في اليوم تعتبره مقبولًا؟", model.KindSingleChoice, guard, false,
-			"أقل من ٥", "من ٥ إلى ١٥", "من ١٥ إلى ٣٠", "لا يهم إن كانت مفيدة"),
 		q(secNotify, "هل جوالك على الصامت أثناء العمل؟", model.KindSingleChoice, guard, false,
 			"صامت تمامًا", "اهتزاز فقط", "صوت مرتفع", "يختلف"),
-		q(secNotify, "هل تفوتك إشعارات مهمة؟ ولماذا؟", model.KindLongText, guard, false),
 	}
 }
 
 func networkQuestions() []model.Question {
 	return []model.Question{
-		q(secNetwork, "ما مصدر الإنترنت لديك أثناء العمل؟", model.KindSingleChoice, guard, false,
-			"باقة بياناتي", "واي فاي الموقع", "الاثنان", "ضعيف أو منقطع غالبًا"),
 		q(secNetwork, "في أي أماكن من موقعك تنقطع الشبكة أو تضعف؟", model.KindLongText, guard, false),
-		q(secNetwork, "كم مرة انقطع عنك الإنترنت أثناء العمل الأسبوع الماضي؟", model.KindSingleChoice, guard, false,
-			"لم ينقطع", "مرة أو مرتين", "عدة مرات", "يوميًا تقريبًا"),
 		q(secNetwork, "ماذا تفعل الآن لو احتجت تسجيل شيء والشبكة مقطوعة؟", model.KindLongText, guard, false),
 		q(secNetwork, "ما الذي يجب أن يعمل بلا إنترنت مهما كان؟", model.KindLongText, guard, true),
 		q(secNetwork, "ما الذي يطمئنك أن ما سجّلته حُفظ ولم يضِع؟", model.KindLongText, guard, false),
-		q(secNetwork, "هل حدث أن سجّلت شيئًا مرتين لأنك لم تتأكد من وصوله؟", model.KindBoolean, guard, false),
-		q(secNetwork, "هل تكفي باقة بياناتك لاستخدام تطبيق العمل طوال الشهر؟", model.KindBoolean, guard, false),
 	}
 }
 
@@ -235,20 +178,12 @@ func usabilityQuestions() []model.Question {
 			"بيد واحدة", "بكلتا اليدين", "يختلف حسب الموقف"),
 		q(secUsability, "في أي وضع تكون غالبًا أثناء استخدام الجوال؟", model.KindMultiChoice, guard, false,
 			"واقف", "أمشي", "داخل السيارة", "جالس"),
-		q(secUsability, "هل تلبس قفازات، وهل تعمل الشاشة معها؟", model.KindLongText, guard, false),
 		q(secUsability, "كيف ترى شاشة الجوال تحت شمس الظهيرة؟", model.KindSingleChoice, guard, false,
 			"واضحة", "أقرأها بصعوبة", "لا أرى شيئًا تقريبًا"),
 		q(secUsability, "هل حجم الخط في التطبيقات مناسب لك؟", model.KindSingleChoice, guard, false,
 			"مناسب", "صغير أحتاج تكبيره", "كبير زيادة"),
-		q(secUsability, "كيف تكون بطارية جوالك في آخر الوردية؟", model.KindSingleChoice, guard, false,
-			"ممتازة", "تكفي بالضبط", "تخلص قبل النهاية", "تخلص بسرعة كبيرة"),
 		q(secUsability, "كم ثانية تعتبر انتظارًا مقبولًا بعد الضغط على زر؟", model.KindSingleChoice, guard, false,
 			"أقل من ثانية", "من ١ إلى ٣ ثوانٍ", "من ٣ إلى ٥ ثوانٍ", "أكثر من ٥ ثوانٍ"),
-		q(secUsability, "هل الكتابة بالعربي على جوالك مريحة؟", model.KindBoolean, guard, false),
-		q(secUsability, "هل تفضّل الاختيار من قائمة جاهزة بدل الكتابة؟", model.KindBoolean, guard, false),
-		q(secUsability, "كم ضغطة تعتبرها مقبولة للوصول إلى أهم شيء تحتاجه؟", model.KindSingleChoice, guard, false,
-			"ضغطة واحدة", "ضغطتان", "ثلاث", "لا يهم العدد"),
-		q(secUsability, "ماذا تفعل لو تعلّق التطبيق في منتصف مهمة؟", model.KindLongText, guard, false),
 		q(secUsability, "عندما تفتح التطبيق، ما أول معلومة تريد رؤيتها؟", model.KindLongText, guard, true),
 	}
 }

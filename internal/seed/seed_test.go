@@ -147,7 +147,14 @@ func TestRequiredQuestionsStayFew(t *testing.T) {
 }
 
 // حجم الاستبيان لكل دور يجب أن يبقى قابلًا للإنجاز في جلسة واحدة.
+// الحارس أضيق سقفًا لأنه يجيب واقفًا وسط وردية، لا جالسًا على مكتب.
 func TestPerRoleLoadStaysReasonable(t *testing.T) {
+	limits := map[model.Category]int{
+		model.CatGuard:          60,
+		model.CatSupervisor:     80,
+		model.CatAreaManager:    80,
+		model.CatCompanyManager: 80,
+	}
 	for _, c := range model.AllCategories {
 		n := 0
 		for _, q := range Questions() {
@@ -158,8 +165,9 @@ func TestPerRoleLoadStaysReasonable(t *testing.T) {
 		if n < 30 {
 			t.Errorf("%s يرى %d سؤالًا فقط — قليل جدًا", model.CategoryLabel(c), n)
 		}
-		if n > 120 {
-			t.Errorf("%s يرى %d سؤالًا — أطول من جلسة واحدة", model.CategoryLabel(c), n)
+		if n > limits[c] {
+			t.Errorf("%s يرى %d سؤالًا والحد %d — أطول من جلسة واحدة",
+				model.CategoryLabel(c), n, limits[c])
 		}
 	}
 }
