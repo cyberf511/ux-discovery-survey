@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>استبيان تطوير تطبيق الحراسات</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div id="app" class="wrap">
+  <div class="loading">جارٍ التحميل…</div>
+</div>
+
+<!-- شاشة اختيار الفئة -->
+<template id="tpl-start">
+  <header class="hero">
+    <h1>ساعدنا نبني التطبيق كما تحتاجه</h1>
+    <p>أسئلة قصيرة عن طريقة عملك اليومية. لا توجد إجابة صحيحة أو خاطئة — نبي نفهم شغلك فقط.</p>
+  </header>
+
+  <h2 class="ask">وش وظيفتك؟</h2>
+  <div class="cats" data-cats></div>
+
+  <label class="field">
+    <span>اسمك (اختياري)</span>
+    <input type="text" data-name placeholder="تقدر تتركه فاضي" autocomplete="off">
+  </label>
+
+  <button class="btn primary big" data-begin disabled>ابدأ</button>
+  <p class="note">إجاباتك تُحفظ تلقائيًا. تقدر تسكّر وترجع تكمّل من نفس المكان.</p>
+</template>
+
+<!-- شاشة السؤال -->
+<template id="tpl-question">
+  <div class="progressbar"><span data-bar></span></div>
+  <div class="topbar">
+    <span data-counter class="counter"></span>
+    <span data-section class="section"></span>
+  </div>
+
+  <h2 class="qtext" data-qtext></h2>
+  <div class="answer" data-answer></div>
+
+  <div class="actions">
+    <button class="btn ghost" data-prev>السابق</button>
+    <button class="btn primary" data-next>التالي</button>
+  </div>
+  <button class="btn link" data-skip>تخطّي هذا السؤال</button>
+  <div class="status" data-status></div>
+</template>
+
+<!-- شاشة الشكر -->
+<template id="tpl-done">
+  <div class="done">
+    <div class="check">✓</div>
+    <h1>شكرًا لك</h1>
+    <p>وصلتنا إجاباتك كاملة. كلامك بيغيّر شكل التطبيق فعليًا.</p>
+    <button class="btn ghost" data-review>راجع إجاباتي</button>
+  </div>
+</template>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

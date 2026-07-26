@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة إدارة الاستبيان</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app" class="wrap admin">
+  <div class="loading">جارٍ التحميل…</div>
+</div>
+
+<!-- تسجيل الدخول -->
+<template id="tpl-login">
+  <h1>لوحة إدارة الاستبيان</h1>
+  <p class="sub">أدخل كلمة مرور الإدارة للمتابعة.</p>
+  <div class="card">
+    <label class="field">
+      <span>كلمة المرور</span>
+      <input type="password" data-pass autocomplete="current-password">
+    </label>
+    <button class="btn primary big" data-login>دخول</button>
+    <div class="status" data-status></div>
+  </div>
+</template>
+
+<!-- اللوحة -->
+<template id="tpl-panel">
+  <div class="row" style="justify-content:space-between;margin-bottom:8px">
+    <h1>لوحة إدارة الاستبيان</h1>
+    <button class="btn ghost" data-logout>خروج</button>
+  </div>
+  <p class="sub" data-openstate></p>
+
+  <div class="stats" data-stats></div>
+
+  <div class="tabs">
+    <button class="tab" data-tab="results" aria-selected="true">النتائج</button>
+    <button class="tab" data-tab="sessions" aria-selected="false">المشاركون</button>
+    <button class="tab" data-tab="questions" aria-selected="false">الأسئلة</button>
+    <button class="tab" data-tab="export" aria-selected="false">تصدير البيانات</button>
+    <button class="tab" data-tab="settings" aria-selected="false">الإعدادات</button>
+  </div>
+
+  <section class="panel" data-panel="results" data-active>
+    <div class="card row">
+      <label class="grow">
+        <span class="small">تصفية بالفئة</span><br>
+        <select data-filter></select>
+      </label>
+      <button class="btn ghost" data-refresh>تحديث</button>
+    </div>
+    <div data-results></div>
+  </section>
+
+  <section class="panel" data-panel="sessions">
+    <div class="card"><div data-sessions></div></div>
+  </section>
+
+  <section class="panel" data-panel="questions">
+    <div class="card">
+      <h3 style="margin-top:0">إضافة سؤال</h3>
+      <div class="row">
+        <input type="text" class="grow" data-qtext placeholder="نص السؤال">
+        <input type="text" data-qsection placeholder="القسم (اختياري)">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <select data-qkind>
+          <option value="long_text">نص طويل</option>
+          <option value="short_text">نص قصير</option>
+          <option value="boolean">صح / خطأ</option>
+          <option value="single_choice">اختيار واحد</option>
+          <option value="multi_choice">اختيار متعدد</option>
+          <option value="ranking">ترتيب قائمة</option>
+          <option value="scale_1_5">مقياس ١–٥</option>
+        </select>
+        <label class="row" style="gap:6px"><input type="checkbox" data-qreq> إلزامي</label>
+        <span class="small">الفئات (بدون اختيار = للجميع):</span>
+        <span data-qcats class="row"></span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" class="grow" data-qopts placeholder="الخيارات مفصولة بفاصلة — للاختيار والترتيب فقط">
+        <button class="btn primary" data-qadd>إضافة</button>
+      </div>
+      <div class="status" data-qstatus></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">استيراد دفعة أسئلة</h3>
+      <p class="small">كل سطر يصبح سؤالًا نصيًا طويلًا. السطر الذي يبدأ بـ <code>##</code> يصبح عنوان قسم للأسطر التي بعده.</p>
+      <textarea data-import rows="6" style="width:100%" placeholder="## الحضور&#10;كيف تسجل حضورك الآن؟&#10;ما المشاكل التي تواجهها؟"></textarea>
+      <div class="row" style="margin-top:10px">
+        <span class="small">الفئات:</span><span data-icats class="row"></span>
+        <button class="btn ghost" data-importbtn>استيراد</button>
+      </div>
+    </div>
+
+    <div class="qlist" data-qlist></div>
+  </section>
+
+  <section class="panel" data-panel="export">
+    <div class="card exports">
+      <h3 style="margin-top:0">تصدير النتائج</h3>
+      <p class="small">ملفات CSV بترميز UTF-8 مع BOM — تفتح في إكسل بالعربي مباشرة دون رموز مكسورة.</p>
+      <a class="btn primary big" data-exportall href="/api/admin/export.csv">تنزيل ملف CSV شامل (كل الفئات)</a>
+      <div class="row">
+        <select data-expcat class="grow"></select>
+        <a class="btn ghost" data-exportcat href="#">تنزيل CSV لهذه الفئة</a>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--line)">
+      <h3>نسخة احتياطية</h3>
+      <p class="small">ملف قاعدة البيانات كاملًا — احتفظ به قبل حذف الحاوية بعد انتهاء الأسبوع.</p>
+      <a class="btn ghost" href="/api/admin/backup.db">تنزيل نسخة احتياطية (survey.db)</a>
+    </div>
+  </section>
+
+  <section class="panel" data-panel="settings">
+    <div class="card">
+      <h3 style="margin-top:0">حالة الاستبيان</h3>
+      <p class="small">قفل الاستبيان يوقف استقبال أي إجابة جديدة، مع بقاء النتائج والتصدير متاحة.</p>
+      <button class="btn primary" data-toggleopen></button>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">رابط المشاركين</h3>
+      <p class="small">وزّع هذا الرابط على الموظفين:</p>
+      <input type="text" data-link readonly style="width:100%">
+    </div>
+  </section>
+</template>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>
