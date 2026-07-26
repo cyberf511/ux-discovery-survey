@@ -50,6 +50,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/meta", s.handleMeta)
 	mux.HandleFunc("POST /api/sessions", s.handleCreateSession)
 	mux.HandleFunc("POST /api/sessions/resume", s.handleResumeSession)
+	mux.HandleFunc("POST /api/sessions/leave", s.handleLeaveSession)
 	mux.HandleFunc("GET /api/sessions/current", s.handleCurrentSession)
 	mux.HandleFunc("GET /api/sessions/{id}", s.handleGetSession)
 	mux.HandleFunc("POST /api/sessions/{id}/answers", s.handleSaveAnswer)
@@ -145,6 +146,20 @@ func (s *Server) handleResumeSession(w http.ResponseWriter, r *http.Request) {
 	}
 	setSessionCookie(w, sess.ID)
 	writeJSON(w, http.StatusOK, sess)
+}
+
+// handleLeaveSession ينسى هوية الجهاز ليبدأ الشخص نفسه استبيانًا بفئة أخرى.
+// لا يحذف الجلسة ولا إجاباتها — الكود يبقى صالحًا للرجوع إليها.
+func (s *Server) handleLeaveSession(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // handleCurrentSession يعيد الجلسة المرتبطة بالكوكي، لتنجو من مسح التخزين المحلي.

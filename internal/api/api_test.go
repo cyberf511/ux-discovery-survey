@@ -156,6 +156,41 @@ func TestCurrentSessionFromCookie(t *testing.T) {
 	}
 }
 
+// «ابدأ من جديد» ينسى هوية الجهاز فقط: الإجابات السابقة تبقى محفوظة
+// حتى يقدر الشخص نفسه يجيب بصفة ثانية بلا أن يفقد ما أجابه أولًا.
+func TestLeaveSessionKeepsAnswers(t *testing.T) {
+	srv, st := newTestServer(t)
+	qid, _ := st.CreateQuestion(model.Question{Text: "سؤال", Kind: model.KindLongText})
+	c := &http.Client{Jar: newJar()}
+
+	_, created := do(t, c, "POST", srv.URL+"/api/sessions", map[string]string{"category": "guard"})
+	id, _ := created["id"].(string)
+	code, _ := created["code"].(string)
+	do(t, c, "POST", srv.URL+"/api/sessions/"+id+"/answers",
+		map[string]any{"question_id": qid, "value": "إجابة الحارس"})
+
+	res, _ := do(t, c, "POST", srv.URL+"/api/sessions/leave", map[string]any{})
+	if res.StatusCode != 200 {
+		t.Fatalf("مغادرة الجلسة فشلت: %d", res.StatusCode)
+	}
+
+	// الكوكي ما عاد يعيد الجلسة، فالمشارك يرى شاشة اختيار الفئة.
+	res, _ = do(t, c, "GET", srv.URL+"/api/sessions/current", nil)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("بعد المغادرة توقعنا 404، وجدنا %d", res.StatusCode)
+	}
+
+	// لكن الجلسة وإجاباتها باقية، ويمكن استرجاعها بالكود.
+	answers, err := st.SessionAnswers(id)
+	if err != nil || len(answers) != 1 {
+		t.Fatalf("الإجابات السابقة يجب أن تبقى: %v %v", answers, err)
+	}
+	res, resumed := do(t, c, "POST", srv.URL+"/api/sessions/resume", map[string]string{"code": code})
+	if res.StatusCode != 200 || resumed["id"] != id {
+		t.Fatalf("الاستئناف بالكود بعد المغادرة فشل: %d %v", res.StatusCode, resumed)
+	}
+}
+
 func TestUnknownCategoryRejected(t *testing.T) {
 	srv, _ := newTestServer(t)
 	res, _ := do(t, srv.Client(), "POST", srv.URL+"/api/sessions",

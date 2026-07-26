@@ -254,15 +254,40 @@
     if (Object.keys(pending()).length) flush(status);
   }
 
-  // showCode يعرض كود المتابعة في الشاشة الحالية إن وُجد.
+  // showCode يعرض كود المتابعة ويربط زر بدء استبيان بصفة أخرى.
   function showCode() {
     var badge = app.querySelector("[data-code-badge]");
-    if (!badge) return;
-    if (!state.code) {
-      badge.parentNode.style.display = "none";
-      return;
+    if (badge) {
+      if (state.code) badge.textContent = state.code;
+      else badge.parentNode.style.display = "none";
     }
-    badge.textContent = state.code;
+    var sw = app.querySelector("[data-switch]");
+    if (sw) sw.addEventListener("click", switchIdentity);
+  }
+
+  // switchIdentity ينسى هوية هذا الجهاز ليجيب الشخص نفسه بصفة أخرى.
+  // الإجابات السابقة تبقى محفوظة على الخادم، وكودها يبقى صالحًا للرجوع.
+  function switchIdentity() {
+    var msg = "بتبدأ استبيانًا جديدًا من الصفر بصفة أخرى.\n\nإجاباتك الحالية محفوظة ولن تُحذف.";
+    if (state.code) msg += "\nكود الرجوع إليها: " + state.code + "\n\nاحفظه قبل المتابعة.";
+    if (!confirm(msg + "\n\nنكمل؟")) return;
+
+    // ننتظر إرسال ما كُتب ولم يُحفظ قبل تفريغ الطابور، وإلا ضاع.
+    queueCurrent();
+    flush(null)
+      .then(function () { return api("POST", "/api/sessions/leave", {}); })
+      .catch(function () { /* مسح الكوكي تحسين لا شرط */ })
+      .then(function () {
+        store(KEY_SESSION, null);
+        store(KEY_INDEX, null);
+        store(KEY_PENDING, null);
+        state.sessionId = null;
+        state.code = "";
+        state.answers = {};
+        state.questions = [];
+        state.index = 0;
+        showStart();
+      });
   }
 
   function isEmpty(v) {
