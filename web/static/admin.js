@@ -125,8 +125,8 @@
           if (p.dataset.panel === activeTab) p.setAttribute("data-active", "");
           else p.removeAttribute("data-active");
         });
-        if (activeTab === "results") loadResults(node);
-        if (activeTab === "sessions") loadSessions(node);
+        if (activeTab === "results") loadResults();
+        if (activeTab === "sessions") loadSessions();
       });
     });
     panels.forEach(function (p) {
@@ -141,12 +141,12 @@
     // مُصفّي النتائج
     var filter = node.querySelector("[data-filter]");
     fillCategorySelect(filter, "كل الفئات");
-    filter.addEventListener("change", function () { loadResults(node); });
+    filter.addEventListener("change", function () { loadResults(); });
     node.querySelector("[data-refresh]").addEventListener("click", function () { load(); });
 
     render(node);
-    if (activeTab === "results") loadResults(app);
-    if (activeTab === "sessions") loadSessions(app);
+    if (activeTab === "results") loadResults();
+    if (activeTab === "sessions") loadSessions();
   }
 
   function statCard(label, num, sub) {
@@ -173,9 +173,11 @@
 
   // ---------- تبويب النتائج ----------
 
-  function loadResults(root) {
-    var filter = root.querySelector("[data-filter]");
-    var box = root.querySelector("[data-results]");
+  // تبحث دائمًا داخل app لا داخل الـfragment المُمرَّر لـrender،
+  // لأن render يفرّغ الـfragment فتصبح استعلاماته لاحقًا فارغة بلا خطأ.
+  function loadResults() {
+    var filter = app.querySelector("[data-filter]");
+    var box = app.querySelector("[data-results]");
     if (!box) return;
     box.textContent = "";
     box.appendChild(el("p", "small", "جارٍ التحميل…"));
@@ -219,8 +221,8 @@
 
   // ---------- تبويب المشاركين ----------
 
-  function loadSessions(root) {
-    var box = root.querySelector("[data-sessions]");
+  function loadSessions() {
+    var box = app.querySelector("[data-sessions]");
     if (!box) return;
     box.textContent = "جارٍ التحميل…";
     api("GET", "/api/admin/results").then(function (data) {

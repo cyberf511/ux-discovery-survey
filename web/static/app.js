@@ -233,7 +233,12 @@
       state.answers[q.id] = val;
       dirty = true;
       next.disabled = q.required && isEmpty(val);
+      scheduleSave(status);
     });
+
+    // الحفظ عند فقدان التركيز يلتقط من يكتب ثم ينتقل لتطبيق آخر.
+    var field = answerBox.querySelector("textarea, input");
+    if (field) field.addEventListener("blur", function () { saveCurrent(status); });
 
     prev.disabled = state.index === 0;
     next.disabled = q.required && isEmpty(state.answers[q.id]);
@@ -266,14 +271,54 @@
     return false;
   }
 
-  function saveThen(status, delta) {
+  // queueCurrent يودع إجابة السؤال الحالي في الطابور الدائم (localStorage).
+  // يُستدعى قبل أي خطر ضياع: إغلاق التبويب، تبديل التطبيق، أو الانتقال.
+  function queueCurrent() {
     var q = currentQuestion();
+    if (!q || !dirty) return false;
     var val = state.answers[q.id];
-    if (!isEmpty(val) && dirty) {
-      queueAnswer(q.id, val);
-      dirty = false;
-      flush(status);
-    }
+    if (isEmpty(val)) return false;
+    queueAnswer(q.id, val);
+    dirty = false;
+    return true;
+  }
+
+  function saveCurrent(status) {
+    if (queueCurrent()) flush(status);
+  }
+
+  var saveTimer = null;
+
+  // الحفظ أثناء الكتابة بمهلة قصيرة: الإجابات الطويلة تأخذ وقتًا،
+  // والحفظ عند الانتقال وحده يضيّعها إن أُغلق المتصفح قبله.
+  function scheduleSave(status) {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { saveCurrent(status); }, 1500);
+  }
+
+  // إغلاق التبويب أو تبديل التطبيق: نودع الإجابة محليًا ثم نرسلها بطلب
+  // لا يُلغى عند إغلاق الصفحة. لو فشل الإرسال تبقى في الطابور للمحاولة التالية.
+  function saveBeforeUnload() {
+    if (!queueCurrent() || !state.sessionId) return;
+    var p = pending();
+    Object.keys(p).forEach(function (qid) {
+      var body = JSON.stringify({ question_id: Number(qid), value: p[qid] });
+      var url = "/api/sessions/" + state.sessionId + "/answers";
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
+      } else {
+        fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body, keepalive: true });
+      }
+    });
+  }
+
+  window.addEventListener("pagehide", saveBeforeUnload);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") saveBeforeUnload();
+  });
+
+  function saveThen(status, delta) {
+    saveCurrent(status);
     move(delta);
   }
 
