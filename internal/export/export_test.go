@@ -62,6 +62,66 @@ func TestWriteCSVRowsAndColumns(t *testing.T) {
 	}
 }
 
+// الشكل الطويل هو المخرج الصالح للتحليل: صف لكل إجابة، بلا خلايا فارغة.
+func TestWriteLongCSVEmitsOneRowPerAnswer(t *testing.T) {
+	q1 := model.Question{ID: 1, Text: "صف يومك", Kind: model.KindLongText, Section: "يوم العمل"}
+	q2 := model.Question{ID: 2, Text: "رتّب الميزات", Kind: model.KindRanking}
+	q3 := model.Question{ID: 3, Text: "سؤال بلا إجابة", Kind: model.KindLongText}
+
+	d := Data{
+		Questions: []model.Question{q1, q2, q3},
+		Sessions: []model.Session{
+			{ID: "s1", Category: model.CatGuard, Name: "فيصل", FinishedAt: "2026-07-27T08:20:00Z"},
+			{ID: "s2", Category: model.CatDashboard, Name: "فهد"},
+			{ID: "s3", Category: model.CatSupervisor, Name: "بلا إجابات"},
+		},
+		Answers: map[string]map[int64]json.RawMessage{
+			"s1": {
+				1: json.RawMessage(`"أبدأ بالتسليم"`),
+				2: json.RawMessage(`["الحضور","البلاغات"]`),
+			},
+			"s2": {1: json.RawMessage(`"أراجع المؤشرات"`)},
+		},
+		AnsweredAt: map[string]map[int64]string{
+			"s1": {1: "2026-07-27T08:01:00Z", 2: "2026-07-27T08:05:00Z"},
+			"s2": {1: "2026-07-27T09:00:00Z"},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteLongCSV(&buf, d); err != nil {
+		t.Fatalf("كتابة CSV الطويل: %v", err)
+	}
+	if !bytes.HasPrefix(buf.Bytes(), []byte(bom)) {
+		t.Fatalf("الملف يجب أن يبدأ بـ BOM")
+	}
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	// ترويسة + ٣ إجابات فقط: لا صفوف للأسئلة بلا إجابة ولا للجلسات الفارغة.
+	if len(lines) != 4 {
+		t.Fatalf("توقعنا ترويسة و٣ صفوف، وجدنا %d:\n%s", len(lines), buf.String())
+	}
+	out := buf.String()
+	if strings.Contains(out, "سؤال بلا إجابة") {
+		t.Fatalf("السؤال بلا إجابة يجب ألا يظهر")
+	}
+	if strings.Contains(out, "بلا إجابات") {
+		t.Fatalf("الجلسة بلا إجابات يجب ألا تظهر")
+	}
+	if !strings.Contains(out, "1. الحضور | 2. البلاغات") {
+		t.Fatalf("سؤال الترتيب يجب أن يُصدَّر مرقّمًا:\n%s", out)
+	}
+	if !strings.Contains(out, "داشبورد") {
+		t.Fatalf("اسم الدور العربي مفقود:\n%s", out)
+	}
+	if !strings.Contains(out, "2026-07-27T08:01:00Z") {
+		t.Fatalf("وقت الإجابة مفقود:\n%s", out)
+	}
+	if !strings.Contains(lines[0], "نوع السؤال") {
+		t.Fatalf("الترويسة ناقصة: %s", lines[0])
+	}
+}
+
 func TestFormatValue(t *testing.T) {
 	cases := []struct {
 		name string

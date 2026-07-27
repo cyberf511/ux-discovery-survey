@@ -367,6 +367,42 @@ func TestExportCSVHasBOMAndAnswers(t *testing.T) {
 	}
 }
 
+func TestExportLongCSVIsRowPerAnswer(t *testing.T) {
+	srv, st := newTestServer(t)
+	q1, _ := st.CreateQuestion(model.Question{
+		Text: "صف يومك", Kind: model.KindLongText, Section: "يوم العمل",
+	})
+	q2, _ := st.CreateQuestion(model.Question{
+		Text: "سؤال بلا إجابة", Kind: model.KindLongText, Section: "يوم العمل",
+	})
+	sess, _ := st.CreateSession(model.CatGuard, "فيصل")
+	st.SaveAnswer(sess.ID, q1, json.RawMessage(`"أبدأ بالتسليم"`))
+	_ = q2
+
+	admin := loginClient(t, srv)
+	res, err := admin.Get(srv.URL + "/api/admin/export-long.csv")
+	if err != nil {
+		t.Fatalf("طلب التصدير الطويل: %v", err)
+	}
+	defer res.Body.Close()
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(res.Body)
+
+	if !bytes.HasPrefix(buf.Bytes(), []byte("\xEF\xBB\xBF")) {
+		t.Fatalf("الملف يجب أن يبدأ بـ BOM")
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("توقعنا ترويسة وصفًا واحدًا، وجدنا %d:\n%s", len(lines), buf.String())
+	}
+	if !strings.Contains(lines[1], "أبدأ بالتسليم") || !strings.Contains(lines[1], "حارس") {
+		t.Fatalf("الصف ناقص: %s", lines[1])
+	}
+	if cd := res.Header.Get("Content-Disposition"); !strings.Contains(cd, "survey-long-") {
+		t.Fatalf("اسم الملف لا يميّز الشكل الطويل: %s", cd)
+	}
+}
+
 func TestBackupDownloadsDatabase(t *testing.T) {
 	srv, _ := newTestServer(t)
 	admin := loginClient(t, srv)

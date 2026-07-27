@@ -11,11 +11,14 @@ import (
 // فئات الاستهداف. لا وجود لفئات مركّبة عمدًا: كل قسم يخص دورًا واحدًا،
 // و all محصورة في الأسئلة الثمانية المشتركة المصممة للمقارنة بين الأدوار.
 var (
-	all        = []model.Category{} // فارغ = يظهر لكل الفئات
+	// jobRoles الأدوار الوظيفية الأربعة — وحدها ترى الأسئلة المشتركة،
+	// لأن «داشبورد» مسار تصميم لا وظيفة يُسأل صاحبها عن يوم عمله.
+	jobRoles   = model.JobRoles
 	guard      = []model.Category{model.CatGuard}
 	supervisor = []model.Category{model.CatSupervisor}
 	area       = []model.Category{model.CatAreaManager}
 	manager    = []model.Category{model.CatCompanyManager}
+	dashboard  = []model.Category{model.CatDashboard}
 )
 
 // Apply يوحّد قاعدة البيانات مع الكتالوج ويعيد عدد الأسئلة المضافة.
@@ -130,6 +133,14 @@ func Questions() []model.Question {
 		payrollQuestions(),
 		qualityQuestions(),
 		execQuestions(),
+
+		// داشبورد — تصميم لوحة القرار التنفيذية
+		dashGoalQuestions(),
+		dashHealthQuestions(),
+		dashContentQuestions(),
+		dashIdentityQuestions(),
+		dashUsageQuestions(),
+		dashSuccessQuestions(),
 	}
 	out := []model.Question{}
 	for _, g := range groups {

@@ -19,6 +19,84 @@ type Data struct {
 	Questions []model.Question
 	Sessions  []model.Session
 	Answers   map[string]map[int64]json.RawMessage
+	// AnsweredAt أوقات الإجابات، تُستخدم في التصدير الطويل وحده.
+	AnsweredAt map[string]map[int64]string
+}
+
+// WriteLongCSV يكتب صفًا لكل إجابة بدل عمود لكل سؤال.
+//
+// الشكل العريض (صف لكل مشارك) يصبح عديم الفائدة مع مئات الأسئلة: معظم
+// خلاياه فارغة لأن كل دور يرى جزءًا من الكتالوج، وصفوفه أطول من أن تُقرأ.
+// الشكل الطويل يُفهرس ويُصفّى ويُجمَّع مباشرة، بشرًا كان القارئ أو نموذجًا.
+func WriteLongCSV(w io.Writer, d Data) error {
+	if _, err := io.WriteString(w, bom); err != nil {
+		return err
+	}
+	cw := csv.NewWriter(w)
+
+	header := []string{
+		"معرّف المشارك", "الدور", "الاسم", "أنهى الاستبيان؟",
+		"القسم", "رقم السؤال", "السؤال", "نوع السؤال", "الإجابة", "وقت الإجابة",
+	}
+	if err := cw.Write(header); err != nil {
+		return err
+	}
+
+	for _, s := range d.Sessions {
+		answers := d.Answers[s.ID]
+		if len(answers) == 0 {
+			continue
+		}
+		for _, q := range d.Questions {
+			raw, ok := answers[q.ID]
+			if !ok {
+				continue
+			}
+			text := FormatValue(q, raw)
+			if text == "" {
+				continue
+			}
+			row := []string{
+				s.ID,
+				model.CategoryLabel(s.Category),
+				s.Name,
+				yesNo(s.Finished()),
+				q.Section,
+				fmt.Sprintf("%d", q.ID),
+				q.Text,
+				KindLabel(q.Kind),
+				text,
+				d.AnsweredAt[s.ID][q.ID],
+			}
+			if err := cw.Write(row); err != nil {
+				return err
+			}
+		}
+	}
+
+	cw.Flush()
+	return cw.Error()
+}
+
+// KindLabel الاسم العربي لنوع السؤال.
+func KindLabel(k model.Kind) string {
+	switch k {
+	case model.KindLongText:
+		return "نص طويل"
+	case model.KindShortText:
+		return "نص قصير"
+	case model.KindBoolean:
+		return "صح/خطأ"
+	case model.KindSingleChoice:
+		return "اختيار واحد"
+	case model.KindMultiChoice:
+		return "اختيار متعدد"
+	case model.KindRanking:
+		return "ترتيب"
+	case model.KindScale:
+		return "مقياس ١–٥"
+	}
+	return string(k)
 }
 
 // WriteCSV يكتب ملف CSV بترميز UTF-8 مع BOM: صف لكل مشارك وعمود لكل سؤال.

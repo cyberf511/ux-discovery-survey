@@ -43,10 +43,18 @@ const (
 	CatSupervisor     Category = "supervisor"
 	CatAreaManager    Category = "area_manager"
 	CatCompanyManager Category = "company_manager"
+	// CatDashboard مسار تصميم لوحة القرار التنفيذية، لا وظيفة ميدانية.
+	// لذلك لا تنطبق عليه الأسئلة المشتركة بين الأدوار الوظيفية.
+	CatDashboard Category = "dashboard"
 )
 
 // AllCategories كل الفئات بالترتيب المعروض.
-var AllCategories = []Category{CatGuard, CatSupervisor, CatAreaManager, CatCompanyManager}
+var AllCategories = []Category{
+	CatGuard, CatSupervisor, CatAreaManager, CatCompanyManager, CatDashboard,
+}
+
+// JobRoles الأدوار الوظيفية وحدها — وهي التي تُقارن ببعضها في التحليل.
+var JobRoles = []Category{CatGuard, CatSupervisor, CatAreaManager, CatCompanyManager}
 
 // CategoryLabels الأسماء العربية المعروضة للفئات.
 var CategoryLabels = map[Category]string{
@@ -54,6 +62,7 @@ var CategoryLabels = map[Category]string{
 	CatSupervisor:     "مشرف ميداني",
 	CatAreaManager:    "مشرف عام",
 	CatCompanyManager: "مدير شركة",
+	CatDashboard:      "داشبورد",
 }
 
 // ValidCategory يتحقق أن الفئة معروفة.

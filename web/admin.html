@@ -130,10 +130,28 @@
     <div class="card exports">
       <h3 style="margin-top:0">تصدير النتائج</h3>
       <p class="small">ملفات CSV بترميز UTF-8 مع BOM — تفتح في إكسل بالعربي مباشرة دون رموز مكسورة.</p>
-      <a class="btn primary big" data-exportall href="/api/admin/export.csv">تنزيل ملف CSV شامل (كل الفئات)</a>
+
+      <a class="btn primary big" data-exportlong href="/api/admin/export-long.csv">
+        تنزيل ملف التحليل — صف لكل إجابة
+      </a>
+      <p class="small">
+        الشكل الموصى به للتحليل ولإعطائه لنموذج ذكاء اصطناعي: أعمدة ثابتة
+        (الدور · القسم · السؤال · نوع السؤال · الإجابة · الوقت) وصف مستقل لكل إجابة،
+        فيُفهرَس ويُصفّى ويُجمَّع مباشرة.
+      </p>
+
+      <a class="btn ghost" data-exportall href="/api/admin/export.csv">
+        تنزيل ملف عريض — صف لكل مشارك
+      </a>
+      <p class="small">
+        عمود لكل سؤال. مناسب لقراءة مشارك واحد كاملًا في إكسل، وغير عملي للتحليل
+        لأن معظم خلاياه فارغة: كل دور يرى جزءًا من الكتالوج فقط.
+      </p>
+
       <div class="row">
         <select data-expcat class="grow"></select>
-        <a class="btn ghost" data-exportcat href="#">تنزيل CSV لهذه الفئة</a>
+        <a class="btn ghost" data-exportcatlong href="#">تحليلي لهذا الدور</a>
+        <a class="btn ghost" data-exportcat href="#">عريض لهذا الدور</a>
       </div>
       <hr style="border:none;border-top:1px solid var(--line)">
       <h3>نسخة احتياطية</h3>

@@ -522,8 +522,13 @@
   function buildExportTab(root) {
     var sel = root.querySelector("[data-expcat]");
     fillCategorySelect(sel, null);
-    var link = root.querySelector("[data-exportcat]");
-    function sync() { link.href = "/api/admin/export.csv?category=" + encodeURIComponent(sel.value); }
+    var wide = root.querySelector("[data-exportcat]");
+    var long = root.querySelector("[data-exportcatlong]");
+    function sync() {
+      var qs = "?category=" + encodeURIComponent(sel.value);
+      wide.href = "/api/admin/export.csv" + qs;
+      long.href = "/api/admin/export-long.csv" + qs;
+    }
     sel.addEventListener("change", sync);
     sync();
   }

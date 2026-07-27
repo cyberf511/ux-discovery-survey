@@ -692,6 +692,30 @@ func (s *Store) AllAnswers() (map[string]map[int64]json.RawMessage, error) {
 	return out, rows.Err()
 }
 
+// AnswerTimes يعيد وقت كل إجابة مفهرسًا بالجلسة ثم السؤال.
+func (s *Store) AnswerTimes() (map[string]map[int64]string, error) {
+	rows, err := s.db.Query(`SELECT session_id, question_id, answered_at FROM answers`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[int64]string{}
+	for rows.Next() {
+		var (
+			sid, at string
+			qid     int64
+		)
+		if err := rows.Scan(&sid, &qid, &at); err != nil {
+			return nil, err
+		}
+		if out[sid] == nil {
+			out[sid] = map[int64]string{}
+		}
+		out[sid][qid] = at
+	}
+	return out, rows.Err()
+}
+
 // AnsweredQuestionIDs يعيد معرّفات الأسئلة التي عليها إجابة واحدة على الأقل.
 func (s *Store) AnsweredQuestionIDs() (map[int64]bool, error) {
 	rows, err := s.db.Query(`SELECT DISTINCT question_id FROM answers`)

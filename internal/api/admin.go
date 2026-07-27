@@ -352,7 +352,16 @@ func (s *Server) exportData(category model.Category) (export.Data, error) {
 	if err != nil {
 		return export.Data{}, err
 	}
-	return export.Data{Questions: questions, Sessions: sessions, Answers: answers}, nil
+	times, err := s.st.AnswerTimes()
+	if err != nil {
+		return export.Data{}, err
+	}
+	return export.Data{
+		Questions:  questions,
+		Sessions:   sessions,
+		Answers:    answers,
+		AnsweredAt: times,
+	}, nil
 }
 
 func (s *Server) handleResults(w http.ResponseWriter, r *http.Request) {
@@ -422,6 +431,16 @@ func sessionViews(sessions []model.Session, answers map[string]map[int64]json.Ra
 }
 
 func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
+	s.exportCSV(w, r, "wide", export.WriteCSV)
+}
+
+// handleExportLongCSV يصدّر صفًا لكل إجابة — الشكل الصالح للتحليل والفهرسة.
+func (s *Server) handleExportLongCSV(w http.ResponseWriter, r *http.Request) {
+	s.exportCSV(w, r, "long", export.WriteLongCSV)
+}
+
+func (s *Server) exportCSV(w http.ResponseWriter, r *http.Request, shape string,
+	write func(io.Writer, export.Data) error) {
 	category := model.Category(r.URL.Query().Get("category"))
 	if category != "" && !model.ValidCategory(category) {
 		writeError(w, http.StatusBadRequest, "فئة غير معروفة")
@@ -436,13 +455,14 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	if category != "" {
 		name = model.CategoryLabel(category)
 	}
-	filename := fmt.Sprintf("survey-%s-%s.csv", name, time.Now().Format("2006-01-02"))
+	date := time.Now().Format("2006-01-02")
+	filename := fmt.Sprintf("survey-%s-%s-%s.csv", shape, name, date)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	// filename* بترميز RFC 5987 حتى تصل الأسماء العربية سليمة إلى المتصفح.
 	w.Header().Set("Content-Disposition",
-		fmt.Sprintf(`attachment; filename="survey-%s.csv"; filename*=UTF-8''%s`,
-			time.Now().Format("2006-01-02"), urlEncode(filename)))
-	if err := export.WriteCSV(w, d); err != nil {
+		fmt.Sprintf(`attachment; filename="survey-%s-%s.csv"; filename*=UTF-8''%s`,
+			shape, date, urlEncode(filename)))
+	if err := write(w, d); err != nil {
 		// الترويسات أُرسلت بالفعل، فلا يمكن إرجاع رمز خطأ.
 		fmt.Fprintf(w, "\n#خطأ أثناء التصدير: %v\n", err)
 	}

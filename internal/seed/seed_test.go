@@ -59,8 +59,13 @@ func TestEveryQuestionIsWellFormed(t *testing.T) {
 func TestEveryQuestionBelongsToExactlyOneRole(t *testing.T) {
 	for _, q := range Questions() {
 		if q.Section == secCommon {
-			if len(q.Categories) != 0 {
-				t.Errorf("السؤال المشترك يجب أن يكون لكل الفئات: %s", q.Text)
+			// المشترك للأدوار الوظيفية وحدها؛ «داشبورد» مسار تصميم
+			// لا يُسأل صاحبه عن يوم عمله في الميدان.
+			if len(q.Categories) != len(model.JobRoles) {
+				t.Errorf("السؤال المشترك يجب أن يكون للأدوار الوظيفية الأربعة: %s", q.Text)
+			}
+			if q.AppliesTo(model.CatDashboard) {
+				t.Errorf("دور الداشبورد لا يجيب على الأسئلة المشتركة: %s", q.Text)
 			}
 			continue
 		}
@@ -141,8 +146,23 @@ func TestRequiredQuestionsStayFew(t *testing.T) {
 			required++
 		}
 	}
-	if required > 12 {
+	if required > 15 {
 		t.Errorf("عدد الأسئلة الإلزامية %d — أكثر مما يحتمله الاستبيان", required)
+	}
+}
+
+// الإلزامي يُقاس لكل دور لا إجماليًا: ما يهم هو ما يواجهه المشارك الواحد.
+func TestRequiredPerRoleStaysFew(t *testing.T) {
+	for _, c := range model.AllCategories {
+		n := 0
+		for _, q := range Questions() {
+			if q.Required && q.AppliesTo(c) {
+				n++
+			}
+		}
+		if n > 6 {
+			t.Errorf("%s يواجه %d سؤالًا إلزاميًا — كثير", model.CategoryLabel(c), n)
+		}
 	}
 }
 
@@ -154,6 +174,7 @@ func TestPerRoleLoadStaysReasonable(t *testing.T) {
 		model.CatSupervisor:     80,
 		model.CatAreaManager:    80,
 		model.CatCompanyManager: 80,
+		model.CatDashboard:      40,
 	}
 	for _, c := range model.AllCategories {
 		n := 0

@@ -52,20 +52,100 @@ const (
 	secPayroll   = "الرواتب والتكاليف"
 	secQuality   = "جودة الخدمة والمخاطر"
 	secExec      = "التقارير التنفيذية"
+
+	// داشبورد — أسئلة تصميم لوحة القرار التنفيذية، تُطرح على الفريق
+	// وتُجمع إجاباتها كتابةً قبل أي إعادة تصميم.
+	secDashGoal     = "الداشبورد — الهدف والقرار"
+	secDashHealth   = "الداشبورد — معنى صحة الشركة"
+	secDashContent  = "الداشبورد — المحتوى والهيكل"
+	secDashIdentity = "الداشبورد — الهوية"
+	secDashUsage    = "الداشبورد — الاستخدام الواقعي"
+	secDashSuccess  = "الداشبورد — قياس النجاح"
 )
+
+// ---------- داشبورد: لوحة القرار التنفيذية ----------
+//
+// الهدف لوحة قرار تنفيذية لأمن AI، لا شبكة widgets عامة. كل سؤال يطلب
+// إجابة محددة لا «حسب الحاجة»، لأن مخرجه هيكل شاشة وقواعد محتوى.
+
+func dashGoalQuestions() []model.Question {
+	return []model.Question{
+		q(secDashGoal, "من هم مستخدمو الداشبورد تحديدًا؟ المدير التنفيذي فقط، أم مدير الشركة، أم مدير العمليات، أم كل دور له نسخة؟", model.KindLongText, dashboard, true),
+		q(secDashGoal, "ما أهم ٣ قرارات يجب أن يتخذها المستخدم من اللوحة خلال أقل من دقيقة؟", model.KindLongText, dashboard, true),
+		q(secDashGoal, "أكمل الجملة: «عندما أفتح الداشبورد أريد أن أعرف فورًا هل ______؟»", model.KindLongText, dashboard, false),
+		q(secDashGoal, "ما الذي يجب أن يدفع المستخدم لاتخاذ إجراء اليوم، لا مجرد مراقبته؟", model.KindLongText, dashboard, false),
+		q(secDashGoal, "ما المعلومات التي لا مكان لها في لوحة تنفيذية ويجب أن تبقى في غرفة العمليات أو صفحات التفاصيل؟", model.KindLongText, dashboard, false),
+	}
+}
+
+func dashHealthQuestions() []model.Question {
+	return []model.Question{
+		q(secDashHealth, "ما التعريف المتفق عليه لـ«شركة بحالة صحية» في أعمال الحراسات؟", model.KindLongText, dashboard, false),
+		q(secDashHealth, "رتّب هذه المجالات حسب أهميتها للقيادة.", model.KindRanking, dashboard, false,
+			"التغطية", "SLA", "الحضور", "الحوادث", "رضا العميل",
+			"العقود", "التحصيل", "الربحية", "الامتثال"),
+		q(secDashHealth, "ما عتبات الخطر الفعلية لكل مجال؟ ومن يملك صلاحية تعديلها؟", model.KindLongText, dashboard, false),
+		q(secDashHealth, "ما الذي يُعتبر إنذارًا حقيقيًا يستحق اللون أو الظهور في أعلى الصفحة؟", model.KindLongText, dashboard, false),
+		q(secDashHealth, "ما الفرق بين مشكلة تحتاج متابعة ومشكلة تحتاج تصعيدًا فوريًا؟", model.KindLongText, dashboard, false),
+	}
+}
+
+func dashContentQuestions() []model.Question {
+	return []model.Question{
+		q(secDashContent, "ما أعلى ٣ استثناءات فقط التي يجب أن تظهر في أول الشاشة؟ وكيف نرتبها؟", model.KindLongText, dashboard, true),
+		q(secDashContent, "لكل استثناء: ما السبب، ومن المالك، وما الإجراء التالي الذي يتوقعه المدير؟", model.KindLongText, dashboard, false),
+		q(secDashContent, "ما المقاييس التي تبدو مهمة حاليًا لكنها لا تقود إلى قرار؟ اذكرها لنحذفها.", model.KindLongText, dashboard, false),
+		q(secDashContent, "ما المقارنات المفيدة: اليوم مقابل أمس، أم هذا الشهر مقابل الهدف، أم فرع مقابل فرع؟", model.KindLongText, dashboard, false),
+		q(secDashContent, "ما مستوى التفصيل المطلوب قبل الانتقال إلى صفحة أخرى؟", model.KindLongText, dashboard, false),
+		q(secDashContent, "هل يحتاج كل دور قالبًا جاهزًا مختلفًا، أم لوحة واحدة مع اختلاف الصلاحيات والمحتوى؟", model.KindSingleChoice, dashboard, false,
+			"قالب مختلف لكل دور", "لوحة واحدة مع اختلاف الصلاحيات والمحتوى"),
+	}
+}
+
+func dashIdentityQuestions() []model.Question {
+	return []model.Question{
+		q(secDashIdentity, "ما الكلمات والمفاهيم التشغيلية التي يستخدمها العميل فعلًا ولا تستخدمها منتجات ERP العامة؟", model.KindLongText, dashboard, false),
+		q(secDashIdentity, "ما الذي يجب أن يشعر به المستخدم؟ اختر ٣ كلمات فقط.", model.KindMultiChoice, dashboard, false,
+			"ثقة", "سيطرة", "هدوء", "حزم", "وضوح"),
+		q(secDashIdentity, "ما الذي يجب أن نرفضه صراحة؟ (بطاقات KPI متشابهة، رسوم للزينة، ألوان نيون، زجاجيات، كثافة مرهقة)", model.KindLongText, dashboard, false),
+		q(secDashIdentity, "هل العربية هي لغة القرار الافتراضية بالكامل؟ وما المصطلحات التي يجب تثبيتها عربيًا وإنجليزيًا؟", model.KindLongText, dashboard, false),
+		q(secDashIdentity, "هل توجد تقارير أو لوحات داخلية يشعر الفريق أنها تمثل شخصية المنصة فعلًا؟ ولماذا؟", model.KindLongText, dashboard, false),
+	}
+}
+
+func dashUsageQuestions() []model.Question {
+	return []model.Question{
+		q(secDashUsage, "أين ومتى يستخدم المدير الداشبورد؟", model.KindMultiChoice, dashboard, false,
+			"مكتب", "اجتماع تنفيذي", "شاشة كبيرة", "هاتف"),
+		q(secDashUsage, "كم مرة يفتحها؟ وما أول إجراء يقوم به بعدها غالبًا؟", model.KindLongText, dashboard, false),
+		q(secDashUsage, "هل يحتاج حفظ ترتيب شخصي؟ وما الحد الذي يمنع التخصيص من كسر اتساق التجربة؟", model.KindLongText, dashboard, false),
+		q(secDashUsage, "ما الذي يجب أن يعمل عبر لوحة المفاتيح؟ وما الذي يجب أن يكون قابلًا للتصدير أو المشاركة؟", model.KindLongText, dashboard, false),
+		q(secDashUsage, "ما حالات البيانات التي يجب تصميمها؟", model.KindMultiChoice, dashboard, false,
+			"لا بيانات", "تأخر تحديث", "صلاحية ناقصة", "مصدر بيانات غير موثوق"),
+	}
+}
+
+func dashSuccessQuestions() []model.Question {
+	return []model.Question{
+		q(secDashSuccess, "بعد الإطلاق، كيف سنعرف أن الداشبورد نجحت؟ (زمن اكتشاف الخطر، نسبة التصعيد في وقته، انخفاض التنقل بين الصفحات)", model.KindLongText, dashboard, false),
+		q(secDashSuccess, "ما أكثر شكوى متوقعة من المستخدمين اليوم؟", model.KindLongText, dashboard, false),
+		q(secDashSuccess, "ما الذي لا يمكن تغييره بسبب صلاحيات أو بيانات أو التزامات عملاء؟", model.KindLongText, dashboard, false),
+		q(secDashSuccess, "ما الذي يجب أن يكون في النسخة الأولى، وما الذي يؤجَّل عمدًا؟", model.KindLongText, dashboard, false),
+	}
+}
 
 // commonQuestions الأسئلة المشتركة بين كل الأدوار — ثمانية فقط.
 // قيمتها في المقارنة: الفجوة بين إجابة الحارس وإجابة المشرف هي المخرج.
 func commonQuestions() []model.Question {
 	return []model.Question{
-		q(secCommon, "صف لي يوم عملك من بداية الوردية إلى نهايتها.", model.KindLongText, all, true),
-		q(secCommon, "ما أكثر شيء يضيع وقتك؟", model.KindLongText, all, true),
-		q(secCommon, "ما أكثر شيء يسبب لك الإحباط في العمل؟", model.KindLongText, all, false),
-		q(secCommon, "ما أكثر شيء تتمنى تحسينه؟", model.KindLongText, all, false),
-		q(secCommon, "ما أكثر شاشة أو أداة تستخدمها يوميًا؟", model.KindLongText, all, false),
-		q(secCommon, "لو كان لك قرار واحد لتغيير النظام، ماذا ستغيّر؟", model.KindLongText, all, true),
-		q(secCommon, "ما الذي يجعلك تستخدم النظام كل يوم؟", model.KindLongText, all, false),
-		q(secCommon, "ما الذي يجعلك تترك النظام وتستخدم واتساب بدلًا عنه؟", model.KindLongText, all, false),
+		q(secCommon, "صف لي يوم عملك من بداية الوردية إلى نهايتها.", model.KindLongText, jobRoles, true),
+		q(secCommon, "ما أكثر شيء يضيع وقتك؟", model.KindLongText, jobRoles, true),
+		q(secCommon, "ما أكثر شيء يسبب لك الإحباط في العمل؟", model.KindLongText, jobRoles, false),
+		q(secCommon, "ما أكثر شيء تتمنى تحسينه؟", model.KindLongText, jobRoles, false),
+		q(secCommon, "ما أكثر شاشة أو أداة تستخدمها يوميًا؟", model.KindLongText, jobRoles, false),
+		q(secCommon, "لو كان لك قرار واحد لتغيير النظام، ماذا ستغيّر؟", model.KindLongText, jobRoles, true),
+		q(secCommon, "ما الذي يجعلك تستخدم النظام كل يوم؟", model.KindLongText, jobRoles, false),
+		q(secCommon, "ما الذي يجعلك تترك النظام وتستخدم واتساب بدلًا عنه؟", model.KindLongText, jobRoles, false),
 	}
 }
 

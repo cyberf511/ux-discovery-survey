@@ -71,6 +71,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("GET /api/admin/results", s.auth(http.HandlerFunc(s.handleResults)))
 	mux.Handle("DELETE /api/admin/sessions/{id}", s.auth(http.HandlerFunc(s.handleDeleteSession)))
 	mux.Handle("GET /api/admin/export.csv", s.auth(http.HandlerFunc(s.handleExportCSV)))
+	mux.Handle("GET /api/admin/export-long.csv", s.auth(http.HandlerFunc(s.handleExportLongCSV)))
 	mux.Handle("GET /api/admin/backup.db", s.auth(http.HandlerFunc(s.handleBackup)))
 
 	return logging(mux)
